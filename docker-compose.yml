@@ -1,0 +1,57 @@
+services:
+  ledger:
+    build:
+      context: .
+      dockerfile: cmd/ledger/Dockerfile
+    environment:
+      TIME_ZONE: ${TIME_ZONE:-UTC}
+      POSTGRES_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      POSTGRES_MAX_CONNS: ${POSTGRES_MAX_CONNS:-10}
+      POSTGRES_MIN_CONNS: ${POSTGRES_MIN_CONNS:-0}
+      POSTGRES_MAX_CONN_LIFETIME: ${POSTGRES_MAX_CONN_LIFETIME:-1h}
+      POSTGRES_MAX_CONN_IDLE_TIME: ${POSTGRES_MAX_CONN_IDLE_TIME:-30m}
+      POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-5s}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: migrate/migrate:v4.19.1
+    profiles: ["migrations"]
+    volumes:
+      - ${PROJECT_ROOT:-.}/migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  lint:
+    image: golangci/golangci-lint:${GOLANGCI_LINT_VERSION:-v2.15.0}
+    profiles: ["lint"]
+    entrypoint: ["golangci-lint"]
+    command: ["run", "./..."]
+    working_dir: /app
+    volumes:
+      - ${PROJECT_ROOT:-.}:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache
+
+volumes:
+  postgres-data:
+  go-mod-cache:
+  go-build-cache:
