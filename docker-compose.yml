@@ -12,6 +12,9 @@ services:
       POSTGRES_MAX_CONN_IDLE_TIME: ${POSTGRES_MAX_CONN_IDLE_TIME:-30m}
       POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-5s}
       IDEMPOTENCY_TTL: ${IDEMPOTENCY_TTL:-24h}
+      GRPC_ADDR: ${GRPC_ADDR:-:50051}
+    ports:
+      - "${GRPC_PORT:-50051}:50051"
     depends_on:
       postgres:
         condition: service_healthy

@@ -12,16 +12,16 @@ var (
 )
 
 type Account struct {
-	ID          int64
-	UserID      int64
-	Name        string
-	Description string
-	Type        AccountType
-	Currency    Currency
-	DebitMinor  int64
-	CreditMinor int64
-	DeletedAt   *time.Time
-	CreatedAt   time.Time
+	ID          int64       `json:"id"`
+	UserID      int64       `json:"user_id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Type        AccountType `json:"type"`
+	Currency    Currency    `json:"currency"`
+	DebitMinor  int64       `json:"debit_minor"`
+	CreditMinor int64       `json:"credit_minor"`
+	DeletedAt   *time.Time  `json:"deleted_at,omitempty"`
+	CreatedAt   time.Time   `json:"created_at"`
 }
 
 func NewAccount(

@@ -18,6 +18,7 @@ import (
 	"github.com/dyingvoid/ledger/internal/domain"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres/repositories"
+	transportgrpc "github.com/dyingvoid/ledger/internal/transport/grpc"
 )
 
 func main() {
@@ -56,12 +57,21 @@ func run() error {
 		return fmt.Errorf("building services: %w", err)
 	}
 
-	return serve(ctx, services)
+	grpcCfg, err := transportgrpc.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("loading grpc config: %w", err)
+	}
+
+	server, err := transportgrpc.NewServer(grpcCfg, services.accounts, services.createAccount)
+	if err != nil {
+		return fmt.Errorf("creating grpc server: %w", err)
+	}
+
+	return serve(ctx, server)
 }
 
 type services struct {
 	accounts      *accounts.Service
-	idempotency   *idempotency.Service
 	createAccount *idempotency.Runner[domain.Account]
 }
 
@@ -78,22 +88,30 @@ func newServices(pool *pgxpool.Pool) (*services, error) {
 
 	return &services{
 		accounts:      accounts.NewService(accountRepository),
-		idempotency:   idempotencyService,
 		createAccount: idempotency.NewRunner[domain.Account](idempotencyService),
 	}, nil
 }
 
-func serve(ctx context.Context, services *services) error {
-	if services == nil ||
-		services.accounts == nil ||
-		services.idempotency == nil ||
-		services.createAccount == nil {
-		return errors.New("services are not initialized")
+func serve(ctx context.Context, server *transportgrpc.Server) error {
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- server.Serve()
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
 	}
 
-	<-ctx.Done()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	return nil
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("shutting down grpc server: %w", err)
+	}
+
+	return <-errCh
 }
 
 func loadLocation() (*time.Location, error) {

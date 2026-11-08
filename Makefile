@@ -6,7 +6,8 @@ APP := ledger
 .PHONY: run build test fmt vet lint lint-fix tidy \
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
-	migrate-up migrate-down migrate-action migrate-create
+	migrate-up migrate-down migrate-action migrate-create \
+	proto-gen proto-lint
 
 run:
 	@go run ./cmd/$(APP)
@@ -76,3 +77,9 @@ migrate-create:
 		-ext sql \
 		-dir /migrations \
 		-seq "$(seq)"
+
+proto-gen:
+	@cd proto && buf generate
+
+proto-lint:
+	@cd proto && buf lint
