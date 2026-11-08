@@ -11,6 +11,7 @@ services:
       POSTGRES_MAX_CONN_LIFETIME: ${POSTGRES_MAX_CONN_LIFETIME:-1h}
       POSTGRES_MAX_CONN_IDLE_TIME: ${POSTGRES_MAX_CONN_IDLE_TIME:-30m}
       POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-5s}
+      IDEMPOTENCY_TTL: ${IDEMPOTENCY_TTL:-24h}
     depends_on:
       postgres:
         condition: service_healthy

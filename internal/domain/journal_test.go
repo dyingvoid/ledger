@@ -74,7 +74,7 @@ func TestNewJournalEntry(t *testing.T) {
 			{
 				name: "unknown account",
 				line: JournalLine{AccountID: 6000, Side: Debit, AmountMinor: 2500},
-				want: ErrAccountTypeUnknown,
+				want: ErrAccountTypeInvalid,
 			},
 			{
 				name: "unset side",

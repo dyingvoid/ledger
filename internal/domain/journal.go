@@ -86,3 +86,10 @@ func (l JournalLine) Validate() error {
 	}
 	return nil
 }
+
+func validateAccountID(id int64) error {
+	if AccountType(id).Valid() {
+		return nil
+	}
+	return fmt.Errorf("%w: %d", ErrAccountTypeInvalid, id)
+}

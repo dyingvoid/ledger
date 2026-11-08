@@ -20,6 +20,7 @@ INSERT INTO ledger.currency (code, name) VALUES
 
 CREATE TABLE ledger.account (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    user_id BIGINT NOT NULL,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     account_type INTEGER NOT NULL REFERENCES ledger.account_type (code),

@@ -5,67 +5,60 @@ import (
 	"testing"
 )
 
-func TestAccountType(t *testing.T) {
+func TestAccountTypeNormalBalance(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		id   int64
-		want AccountType
+		name        string
+		accountType AccountType
+		want        BalanceSide
 	}{
-		{name: "asset lower bound", id: 1000, want: AccountTypeAsset},
-		{name: "asset upper bound", id: 1999, want: AccountTypeAsset},
-		{name: "liability lower bound", id: 2000, want: AccountTypeLiability},
-		{name: "liability upper bound", id: 2999, want: AccountTypeLiability},
-		{name: "equity lower bound", id: 3000, want: AccountTypeEquity},
-		{name: "equity upper bound", id: 3999, want: AccountTypeEquity},
-		{name: "revenue lower bound", id: 4000, want: AccountTypeRevenue},
-		{name: "revenue upper bound", id: 4999, want: AccountTypeRevenue},
-		{name: "expense lower bound", id: 5000, want: AccountTypeExpense},
-		{name: "expense upper bound", id: 5999, want: AccountTypeExpense},
-		{name: "unassigned range", id: 6000, want: AccountTypeUnknown},
-		{name: "below range", id: 999, want: AccountTypeUnknown},
+		{name: "asset lower bound", accountType: 1000, want: Debit},
+		{name: "asset upper bound", accountType: 1999, want: Debit},
+		{name: "liability lower bound", accountType: 2000, want: Credit},
+		{name: "revenue upper bound", accountType: 4999, want: Credit},
+		{name: "expense lower bound", accountType: 5000, want: Debit},
+		{name: "expense upper bound", accountType: 5999, want: Debit},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			account := Account{ID: test.id}
-			if got := account.Type(); got != test.want {
-				t.Fatalf("Type() = %d, want %d", got, test.want)
+			balance, err := test.accountType.NormalBalance()
+			if err != nil {
+				t.Fatalf("NormalBalance() error = %v", err)
+			}
+			if balance != test.want {
+				t.Fatalf("NormalBalance() = %d, want %d", balance, test.want)
 			}
 		})
 	}
+
+	for _, accountType := range []AccountType{999, 6000} {
+		if _, err := accountType.NormalBalance(); !errors.Is(err, ErrAccountTypeInvalid) {
+			t.Fatalf("NormalBalance() error = %v, want %v", err, ErrAccountTypeInvalid)
+		}
+	}
 }
 
-func TestAccountNormalBalance(t *testing.T) {
+func TestAccountTypeValid(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		id   int64
-		want BalanceSide
+		accountType AccountType
+		want        bool
 	}{
-		{id: 1000, want: Debit},
-		{id: 2000, want: Credit},
-		{id: 3000, want: Credit},
-		{id: 4000, want: Credit},
-		{id: 5000, want: Debit},
+		{accountType: 999, want: false},
+		{accountType: 1000, want: true},
+		{accountType: 5999, want: true},
+		{accountType: 6000, want: false},
 	}
 
 	for _, test := range tests {
-		account := Account{ID: test.id}
-		balance, err := account.NormalBalance()
-		if err != nil {
-			t.Fatalf("NormalBalance() for %d error = %v", test.id, err)
+		if got := test.accountType.Valid(); got != test.want {
+			t.Fatalf("Valid() for %d = %t, want %t", test.accountType, got, test.want)
 		}
-		if balance != test.want {
-			t.Fatalf("NormalBalance() for %d = %d, want %d", test.id, balance, test.want)
-		}
-	}
-
-	if _, err := (Account{ID: 6000}).NormalBalance(); !errors.Is(err, ErrAccountTypeUnknown) {
-		t.Fatalf("NormalBalance() error = %v, want %v", err, ErrAccountTypeUnknown)
 	}
 }
 
@@ -75,32 +68,52 @@ func TestNewAccount(t *testing.T) {
 	t.Run("trims name and description", func(t *testing.T) {
 		t.Parallel()
 
-		account, err := NewAccount(1000, "  Cash  ", "  Petty cash  ")
+		account, err := NewAccount(7, "  Daily  ", "  Spending  ", 2100, "USD")
 		if err != nil {
 			t.Fatalf("NewAccount() error = %v", err)
 		}
-		if account.Name != "Cash" {
-			t.Fatalf("Name = %q, want %q", account.Name, "Cash")
+		if account.Name != "Daily" {
+			t.Fatalf("Name = %q, want %q", account.Name, "Daily")
 		}
-		if account.Description != "Petty cash" {
-			t.Fatalf("Description = %q, want %q", account.Description, "Petty cash")
+		if account.Description != "Spending" {
+			t.Fatalf("Description = %q, want %q", account.Description, "Spending")
 		}
 	})
 
-	t.Run("rejects unknown account ID", func(t *testing.T) {
+	t.Run("rejects missing user", func(t *testing.T) {
 		t.Parallel()
 
-		for _, id := range []int64{999, 6000, 9999} {
-			if _, err := NewAccount(id, "Cash", ""); !errors.Is(err, ErrAccountTypeUnknown) {
-				t.Fatalf("NewAccount(%d) error = %v, want %v", id, err, ErrAccountTypeUnknown)
+		_, err := NewAccount(0, "Daily", "", 2100, "USD")
+		if !errors.Is(err, ErrAccountUserRequired) {
+			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountUserRequired)
+		}
+	})
+
+	t.Run("rejects account type outside the nominal range", func(t *testing.T) {
+		t.Parallel()
+
+		for _, accountType := range []AccountType{999, 6000} {
+			_, err := NewAccount(7, "Daily", "", accountType, "USD")
+			if !errors.Is(err, ErrAccountTypeInvalid) {
+				t.Fatalf("NewAccount(%d) error = %v, want %v", accountType, err, ErrAccountTypeInvalid)
 			}
+		}
+	})
+
+	t.Run("rejects empty currency", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := NewAccount(7, "Daily", "", 2100, "  ")
+		if !errors.Is(err, ErrAccountCurrencyRequired) {
+			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountCurrencyRequired)
 		}
 	})
 
 	t.Run("rejects empty name", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := NewAccount(1000, "  ", ""); !errors.Is(err, ErrAccountNameRequired) {
+		_, err := NewAccount(7, "  ", "", 2100, "USD")
+		if !errors.Is(err, ErrAccountNameRequired) {
 			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountNameRequired)
 		}
 	})
