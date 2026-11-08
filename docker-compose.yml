@@ -11,9 +11,13 @@ services:
       POSTGRES_MAX_CONN_LIFETIME: ${POSTGRES_MAX_CONN_LIFETIME:-1h}
       POSTGRES_MAX_CONN_IDLE_TIME: ${POSTGRES_MAX_CONN_IDLE_TIME:-30m}
       POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-5s}
+      TIGERBEETLE_CLUSTER_ID: ${TIGERBEETLE_CLUSTER_ID:-0}
+      TIGERBEETLE_ADDRESSES: tigerbeetle:3000
     depends_on:
       postgres:
         condition: service_healthy
+      tigerbeetle:
+        condition: service_started
 
   postgres:
     image: postgres:17.6-alpine
@@ -30,6 +34,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  tigerbeetle:
+    image: ghcr.io/tigerbeetle/tigerbeetle:0.17.9
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ ! -f /data/0_0.tigerbeetle ]; then
+          /tigerbeetle format --cluster=${TIGERBEETLE_CLUSTER_ID:-0} --replica=0 --replica-count=1 --development /data/0_0.tigerbeetle
+        fi
+        exec /tigerbeetle start --addresses=0.0.0.0:3000 --development /data/0_0.tigerbeetle
+    ports:
+      - "${TIGERBEETLE_PORT:-3000}:3000"
+    volumes:
+      - tigerbeetle-data:/data
+    security_opt:
+      - seccomp=unconfined
 
   migrate:
     image: migrate/migrate:v4.19.1
@@ -53,5 +73,6 @@ services:
 
 volumes:
   postgres-data:
+  tigerbeetle-data:
   go-mod-cache:
   go-build-cache:

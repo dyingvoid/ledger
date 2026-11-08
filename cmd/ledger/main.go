@@ -13,6 +13,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
+	"github.com/dyingvoid/ledger/internal/infrastructure/tigerbeetle"
 )
 
 func main() {
@@ -45,6 +46,17 @@ func run() error {
 		return fmt.Errorf("connecting to postgres: %w", err)
 	}
 	defer pool.Close()
+
+	tbCfg, err := tigerbeetle.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("loading tigerbeetle config: %w", err)
+	}
+
+	tbClient, err := tigerbeetle.NewClient(tbCfg)
+	if err != nil {
+		return fmt.Errorf("connecting to tigerbeetle: %w", err)
+	}
+	defer tbClient.Close()
 
 	<-ctx.Done()
 

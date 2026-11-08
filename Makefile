@@ -6,6 +6,7 @@ APP := ledger
 .PHONY: run build test fmt vet lint lint-fix tidy \
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
+	tigerbeetle-up tigerbeetle-down tigerbeetle-logs \
 	migrate-up migrate-down migrate-action migrate-create
 
 run:
@@ -49,6 +50,15 @@ postgres-down:
 
 postgres-logs:
 	@docker compose logs -f postgres
+
+tigerbeetle-up:
+	@docker compose up -d --wait tigerbeetle
+
+tigerbeetle-down:
+	@docker compose down
+
+tigerbeetle-logs:
+	@docker compose logs -f tigerbeetle
 
 migrate-up:
 	@$(MAKE) migrate-action action=up

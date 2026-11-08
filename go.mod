@@ -6,6 +6,7 @@ require (
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/tigerbeetle/tigerbeetle-go v0.17.10
 )
 
 require (
