@@ -22,6 +22,7 @@ CREATE TABLE ledger.account (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
+    account_type INTEGER NOT NULL REFERENCES ledger.account_type (code),
     currency TEXT NOT NULL REFERENCES ledger.currency (code),
     cr BIGINT NOT NULL DEFAULT 0,
     dr BIGINT NOT NULL DEFAULT 0,
@@ -54,6 +55,8 @@ CREATE TABLE ledger.journal_line (
 CREATE INDEX journal_line_journal_entry_id_idx ON ledger.journal_line (journal_entry_id);
 CREATE INDEX journal_line_account_id_idx ON ledger.journal_line (account_id);
 CREATE INDEX account_active_idx ON ledger.account (id) WHERE deleted_at IS NULL;
+CREATE INDEX account_currency_idx ON ledger.account (currency);
+CREATE INDEX account_account_type_idx ON ledger.account (account_type);
 
 CREATE FUNCTION ledger.reject_delete() RETURNS trigger AS $$
 BEGIN
