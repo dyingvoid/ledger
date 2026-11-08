@@ -29,8 +29,15 @@ CREATE TABLE ledger.account (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE ledger.entry_type (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE ledger.journal_entry (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    entry_type TEXT NOT NULL REFERENCES ledger.entry_type (code),
     entry_date DATE NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
