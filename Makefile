@@ -3,12 +3,15 @@ export
 
 APP := ledger
 MIGRATE_LOCK_TIMEOUT ?= 5
+RATE ?= 6
+DURATION ?= 5m
 
 .PHONY: run build test test-integration fmt vet lint lint-fix tidy \
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
 	migrate-up migrate-down migrate-action migrate-create \
-	proto-gen proto-lint
+	proto-gen proto-lint \
+	loadtest-deposit loadtest-matrix
 
 run:
 	@go run ./cmd/$(APP)
@@ -88,3 +91,13 @@ proto-gen:
 
 proto-lint:
 	@cd proto && buf lint
+
+loadtest-deposit:
+	@set -a; . ./.env; [ -f loadtest/seed.env ] && . ./loadtest/seed.env; set +a; \
+		k6 run -e RATE=$(RATE) -e DURATION=$(DURATION) \
+			-e ACCOUNT_MIN_ID=$${ACCOUNT_MIN_ID:-4} \
+			-e ACCOUNT_COUNT=$${ACCOUNT_COUNT:-15000000} \
+			loadtest/deposit.js
+
+loadtest-matrix:
+	@./loadtest/run-matrix.sh

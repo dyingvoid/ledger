@@ -92,7 +92,7 @@ func applyMigrations(ctx context.Context, dsn string) error {
 
 	var files []string
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".up.sql") {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".up.sql") && !strings.Contains(entry.Name(), "_seed_") {
 			files = append(files, filepath.Join("..", "migrations", entry.Name()))
 		}
 	}
