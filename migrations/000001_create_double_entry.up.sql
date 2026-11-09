@@ -13,11 +13,6 @@ CREATE TABLE ledger.currency (
     name TEXT NOT NULL DEFAULT ''
 );
 
-INSERT INTO ledger.currency (code, name) VALUES
-    ('USD', 'US Dollar'),
-    ('CNY', 'Chinese Yuan'),
-    ('RUB', 'Russian Ruble');
-
 CREATE TABLE ledger.account (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     user_id BIGINT NOT NULL,
