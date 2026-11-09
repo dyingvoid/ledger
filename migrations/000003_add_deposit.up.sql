@@ -12,9 +12,9 @@ DECLARE
     v_client_currency TEXT;
     v_journal_entry_id BIGINT;
 BEGIN
-    IF p_amount_minor <= 0 THEN
+    IF p_amount_minor IS NULL OR p_amount_minor <= 0 THEN
         RAISE EXCEPTION 'deposit amount must be positive'
-            USING ERRCODE = '22023';
+            USING ERRCODE = 'LEDG1';
     END IF;
 
     SELECT a.account_type, a.currency
@@ -30,13 +30,13 @@ BEGIN
 
     IF v_client_account_type <> 2100 THEN
         RAISE EXCEPTION 'account % is not a client deposit account', p_account_id
-            USING ERRCODE = '22023';
+            USING ERRCODE = 'LEDG2';
     END IF;
 
-    IF v_client_currency <> p_currency THEN
+    IF v_client_currency IS DISTINCT FROM p_currency THEN
         RAISE EXCEPTION 'account % currency % does not match deposit currency %',
             p_account_id, v_client_currency, p_currency
-            USING ERRCODE = '22023';
+            USING ERRCODE = 'LEDG3';
     END IF;
 
     SELECT a.id

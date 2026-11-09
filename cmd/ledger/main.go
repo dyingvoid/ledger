@@ -14,6 +14,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
+	"github.com/dyingvoid/ledger/internal/core/deposits"
 	"github.com/dyingvoid/ledger/internal/core/idempotency"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres/repositories"
@@ -74,7 +75,13 @@ func run() error {
 		return fmt.Errorf("loading grpc config: %w", err)
 	}
 
-	server, err := transportgrpc.NewServer(grpcCfg, log, services.accounts, services.idempotencyService)
+	server, err := transportgrpc.NewServer(
+		grpcCfg,
+		log,
+		services.accounts,
+		services.deposits,
+		services.idempotencyService,
+	)
 	if err != nil {
 		return fmt.Errorf("creating grpc server: %w", err)
 	}
@@ -84,6 +91,7 @@ func run() error {
 
 type services struct {
 	accounts           *accounts.Service
+	deposits           *deposits.Service
 	idempotencyService *idempotency.Service
 }
 
@@ -94,12 +102,14 @@ func newServices(pool *pgxpool.Pool) (*services, error) {
 	}
 
 	accountRepository := repositories.NewAccounts(pool)
+	depositRepository := repositories.NewDeposits(pool)
 	idempotencyStore := repositories.NewIdempotency(pool)
 	unitOfWork := postgres.NewUnitOfWork(pool)
 	idempotencyService := idempotency.NewService(idempotencyStore, unitOfWork, idempotencyCfg)
 
 	return &services{
 		accounts:           accounts.NewService(accountRepository),
+		deposits:           deposits.NewService(depositRepository),
 		idempotencyService: idempotencyService,
 	}, nil
 }

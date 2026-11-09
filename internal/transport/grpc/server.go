@@ -11,8 +11,10 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
+	"github.com/dyingvoid/ledger/internal/core/deposits"
 	"github.com/dyingvoid/ledger/internal/core/idempotency"
 	accountsv1 "github.com/dyingvoid/ledger/pkg/proto/ledger/accounts/v1"
+	fundsv1 "github.com/dyingvoid/ledger/pkg/proto/ledger/funds/v1"
 )
 
 type Server struct {
@@ -24,6 +26,7 @@ func NewServer(
 	cfg Config,
 	log *slog.Logger,
 	accountsService *accounts.Service,
+	depositsService *deposits.Service,
 	idempotencyService *idempotency.Service,
 ) (*Server, error) {
 	listener, err := net.Listen("tcp", cfg.Addr)
@@ -39,6 +42,7 @@ func NewServer(
 		),
 	)
 	accountsv1.RegisterAccountServiceServer(server, newAccountService(accountsService, idempotencyService))
+	fundsv1.RegisterFundsServiceServer(server, newFundsService(depositsService, idempotencyService))
 	reflection.Register(server)
 
 	return &Server{server: server, listener: listener}, nil
