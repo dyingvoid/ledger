@@ -2,6 +2,7 @@
 export
 
 APP := ledger
+MIGRATE_LOCK_TIMEOUT ?= 5
 
 .PHONY: run build test test-integration fmt vet lint lint-fix tidy \
 	docker-up docker-down docker-logs \
@@ -68,6 +69,7 @@ migrate-action:
 	@docker compose run --rm migrate \
 		-path /migrations \
 		-database "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable" \
+		-lock-timeout $(MIGRATE_LOCK_TIMEOUT) \
 		"$(action)"
 
 migrate-create:

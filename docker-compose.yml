@@ -38,6 +38,8 @@ services:
   migrate:
     image: migrate/migrate:v4.19.1
     profiles: ["migrations"]
+    environment:
+      PGOPTIONS: "-c lock_timeout=${MIGRATE_LOCK_TIMEOUT:-5}s"
     volumes:
       - ${PROJECT_ROOT:-.}/migrations:/migrations
     depends_on:

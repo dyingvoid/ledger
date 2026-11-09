@@ -103,6 +103,10 @@ func applyMigrations(ctx context.Context, dsn string) error {
 		return fmt.Errorf("parsing postgres config: %w", err)
 	}
 	cfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	if cfg.RuntimeParams == nil {
+		cfg.RuntimeParams = map[string]string{}
+	}
+	cfg.RuntimeParams["lock_timeout"] = "5s"
 
 	conn, err := pgx.ConnectConfig(ctx, cfg)
 	if err != nil {
