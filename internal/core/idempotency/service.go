@@ -69,28 +69,30 @@ func (s *Service) execute(
 	)
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+		existing, err := s.store.Get(txCtx, key)
+		switch {
+		case err == nil:
+			result, replayed, err = replay(existing)
+			return err
+		case errors.Is(err, ErrRecordNotFound):
+		default:
+			return fmt.Errorf("reading idempotency record: %w", err)
+		}
+
 		claimed, err := s.store.Claim(txCtx, key, s.expiresAt())
 		if err != nil {
 			return fmt.Errorf("claiming idempotency key: %w", err)
 		}
 		if !claimed {
-			record, found, err := s.store.Get(txCtx, key)
+			existing, err := s.store.Get(txCtx, key)
 			if err != nil {
+				if errors.Is(err, ErrRecordNotFound) {
+					return fmt.Errorf("%w: %q", ErrRecordNotFound, key)
+				}
 				return fmt.Errorf("reading idempotency record: %w", err)
 			}
-			if !found {
-				return fmt.Errorf("%w: %q", ErrRecordNotFound, key)
-			}
-			switch record.Status {
-			case StatusSuccess:
-				result = record.Result
-				replayed = true
-				return nil
-			case StatusFail:
-				return fmt.Errorf("%w: %s", ErrPreviousAttemptFailed, record.Error)
-			default:
-				return fmt.Errorf("%w: %q", ErrUnknownStatus, record.Status)
-			}
+			result, replayed, err = replay(existing)
+			return err
 		}
 
 		businessErr = s.uow.WithinTransaction(txCtx, func(businessCtx context.Context) error {
@@ -133,6 +135,17 @@ func (s *Service) execute(
 	}
 
 	return result, replayed, nil
+}
+
+func replay(record Record) ([]byte, bool, error) {
+	switch record.Status {
+	case StatusSuccess:
+		return record.Result, true, nil
+	case StatusFail:
+		return nil, false, fmt.Errorf("%w: %s", ErrPreviousAttemptFailed, record.Error)
+	default:
+		return nil, false, fmt.Errorf("%w: %q", ErrUnknownStatus, record.Status)
+	}
 }
 
 func (s *Service) expiresAt() time.Time {

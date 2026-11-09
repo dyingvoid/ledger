@@ -37,15 +37,15 @@ func (f *fakeStore) Claim(_ context.Context, key string, expiresAt time.Time) (b
 	return true, nil
 }
 
-func (f *fakeStore) Get(_ context.Context, key string) (Record, bool, error) {
+func (f *fakeStore) Get(_ context.Context, key string) (Record, error) {
 	if f.getErr != nil {
-		return Record{}, false, f.getErr
+		return Record{}, f.getErr
 	}
 	record, ok := f.records[key]
 	if !ok || !record.ExpiresAt.After(time.Now()) {
-		return Record{}, false, nil
+		return Record{}, ErrRecordNotFound
 	}
-	return record, true, nil
+	return record, nil
 }
 
 func (f *fakeStore) Complete(_ context.Context, record Record) error {
@@ -145,6 +145,9 @@ func TestExecuteReplaysSuccess(t *testing.T) {
 	if string(result) != `{"journal_entry_id":9}` {
 		t.Fatalf("result = %s, want %s", result, `{"journal_entry_id":9}`)
 	}
+	if store.claimCalls != 0 {
+		t.Fatalf("Claim() calls = %d, want 0", store.claimCalls)
+	}
 	if store.completeCalls != 0 {
 		t.Fatalf("Complete() calls = %d, want 0", store.completeCalls)
 	}
@@ -175,6 +178,9 @@ func TestExecuteReplaysFailure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "insufficient funds") {
 		t.Fatalf("Execute() error = %v, want stored failure message", err)
+	}
+	if store.claimCalls != 0 {
+		t.Fatalf("Claim() calls = %d, want 0", store.claimCalls)
 	}
 }
 
@@ -281,6 +287,30 @@ func TestExecuteValidatesKey(t *testing.T) {
 				t.Fatalf("Execute() error = %v, want %v", err, test.want)
 			}
 		})
+	}
+}
+
+func TestExecuteReturnsGetError(t *testing.T) {
+	t.Parallel()
+
+	getErr := errors.New("database unavailable")
+	store := newFakeStore()
+	store.getErr = getErr
+	service := newTestService(t, store, &fakeUnitOfWork{})
+
+	_, _, err := service.execute(
+		context.Background(),
+		"create_account:3",
+		func(context.Context) ([]byte, error) {
+			t.Fatal("business logic must not run when reading fails")
+			return nil, nil
+		},
+	)
+	if !errors.Is(err, getErr) {
+		t.Fatalf("Execute() error = %v, want %v", err, getErr)
+	}
+	if store.claimCalls != 0 {
+		t.Fatalf("Claim() calls = %d, want 0", store.claimCalls)
 	}
 }
 

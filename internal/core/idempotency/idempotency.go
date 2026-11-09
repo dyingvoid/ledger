@@ -34,7 +34,7 @@ type Record struct {
 
 type Store interface {
 	Claim(ctx context.Context, key string, expiresAt time.Time) (bool, error)
-	Get(ctx context.Context, key string) (Record, bool, error)
+	Get(ctx context.Context, key string) (Record, error)
 	Complete(ctx context.Context, record Record) error
 }
 

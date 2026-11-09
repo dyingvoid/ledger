@@ -153,7 +153,6 @@ func TestConcurrentClaimWaitsForFirstTransaction(t *testing.T) {
 
 	type secondOutcome struct {
 		claimed bool
-		found   bool
 		record  idempotency.Record
 		err     error
 	}
@@ -178,8 +177,8 @@ func TestConcurrentClaimWaitsForFirstTransaction(t *testing.T) {
 			return
 		}
 
-		record, found, err := testStore.Get(txCtx2, key)
-		secondDone <- secondOutcome{claimed: claimed, found: found, record: record, err: err}
+		record, err := testStore.Get(txCtx2, key)
+		secondDone <- secondOutcome{claimed: claimed, record: record, err: err}
 	}()
 
 	<-claimStarted
@@ -209,9 +208,6 @@ func TestConcurrentClaimWaitsForFirstTransaction(t *testing.T) {
 		}
 		if outcome.claimed {
 			t.Fatal("second Claim() = true, want false")
-		}
-		if !outcome.found {
-			t.Fatal("second Get() found = false, want true")
 		}
 		if outcome.record.Status != idempotency.StatusSuccess {
 			t.Fatalf("second record status = %q, want %q", outcome.record.Status, idempotency.StatusSuccess)
@@ -407,12 +403,9 @@ func TestClaimReclaimsExpiredRecord(t *testing.T) {
 		t.Fatal("Claim() = false, want true for an expired record")
 	}
 
-	record, found, err := testStore.Get(ctx, key)
+	record, err := testStore.Get(ctx, key)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
-	}
-	if !found {
-		t.Fatal("Get() found = false, want true")
 	}
 	if record.Status != idempotency.StatusInProgress {
 		t.Fatalf("record status = %q, want %q", record.Status, idempotency.StatusInProgress)
