@@ -8,6 +8,7 @@ import (
 	"net"
 
 	grpcpkg "google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
 	"github.com/dyingvoid/ledger/internal/core/idempotency"
@@ -38,6 +39,7 @@ func NewServer(
 		),
 	)
 	accountsv1.RegisterAccountServiceServer(server, newAccountService(accountsService, idempotencyService))
+	reflection.Register(server)
 
 	return &Server{server: server, listener: listener}, nil
 }
