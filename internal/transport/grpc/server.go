@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 
 	grpcpkg "google.golang.org/grpc"
@@ -20,6 +21,7 @@ type Server struct {
 
 func NewServer(
 	cfg Config,
+	log *slog.Logger,
 	accountsService *accounts.Service,
 	idempotencyService *idempotency.Service,
 ) (*Server, error) {
@@ -28,7 +30,13 @@ func NewServer(
 		return nil, fmt.Errorf("listening on %s: %w", cfg.Addr, err)
 	}
 
-	server := grpcpkg.NewServer()
+	server := grpcpkg.NewServer(
+		grpcpkg.ChainUnaryInterceptor(
+			loggerInterceptor(log),
+			recoverInterceptor(),
+			traceInterceptor(),
+		),
+	)
 	accountsv1.RegisterAccountServiceServer(server, newAccountService(accountsService, idempotencyService))
 
 	return &Server{server: server, listener: listener}, nil

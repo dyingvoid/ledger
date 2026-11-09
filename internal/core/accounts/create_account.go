@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dyingvoid/ledger/internal/domain"
+	"github.com/dyingvoid/ledger/internal/logger"
 )
 
 var (
@@ -41,6 +42,13 @@ func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams)
 	if err != nil {
 		return domain.Account{}, fmt.Errorf("creating account: %w", err)
 	}
+
+	logger.FromContext(ctx).InfoContext(
+		ctx,
+		"account created",
+		"account_id", created.ID,
+		"user_id", created.UserID,
+	)
 
 	return created, nil
 }

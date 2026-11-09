@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,12 +17,14 @@ import (
 	"github.com/dyingvoid/ledger/internal/core/idempotency"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres/repositories"
+	"github.com/dyingvoid/ledger/internal/logger"
 	transportgrpc "github.com/dyingvoid/ledger/internal/transport/grpc"
 )
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatal(err)
+		slog.Error("application failed", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -30,6 +32,17 @@ func run() error {
 	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("loading .env: %w", err)
 	}
+
+	logCfg, err := logger.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("loading logger config: %w", err)
+	}
+
+	log, err := logger.New(logCfg)
+	if err != nil {
+		return fmt.Errorf("creating logger: %w", err)
+	}
+	slog.SetDefault(log)
 
 	location, err := loadLocation()
 	if err != nil {
@@ -61,12 +74,12 @@ func run() error {
 		return fmt.Errorf("loading grpc config: %w", err)
 	}
 
-	server, err := transportgrpc.NewServer(grpcCfg, services.accounts, services.idempotencyService)
+	server, err := transportgrpc.NewServer(grpcCfg, log, services.accounts, services.idempotencyService)
 	if err != nil {
 		return fmt.Errorf("creating grpc server: %w", err)
 	}
 
-	return serve(ctx, server)
+	return serve(ctx, server, log)
 }
 
 type services struct {
@@ -91,7 +104,9 @@ func newServices(pool *pgxpool.Pool) (*services, error) {
 	}, nil
 }
 
-func serve(ctx context.Context, server *transportgrpc.Server) error {
+func serve(ctx context.Context, server *transportgrpc.Server, log *slog.Logger) error {
+	log.Info("starting grpc server", "addr", server.Addr().String())
+
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- server.Serve()
@@ -103,12 +118,16 @@ func serve(ctx context.Context, server *transportgrpc.Server) error {
 	case <-ctx.Done():
 	}
 
+	log.Info("shutting down grpc server")
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutting down grpc server: %w", err)
 	}
+
+	log.Info("grpc server stopped")
 
 	return <-errCh
 }

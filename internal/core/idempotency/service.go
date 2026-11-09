@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/dyingvoid/ledger/internal/logger"
 )
 
 type Service struct {
@@ -48,6 +50,10 @@ func (s *Service) Execute[T any](
 	var value T
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return zero, replayed, fmt.Errorf("unmarshalling idempotent result: %w", err)
+	}
+
+	if replayed {
+		logger.FromContext(ctx).InfoContext(ctx, "idempotent request replayed", "idempotency_key", key)
 	}
 
 	return value, replayed, nil
