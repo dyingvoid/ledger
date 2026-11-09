@@ -22,17 +22,17 @@ const idempotencyKeyHeader = "x-idempotency-key"
 
 type accountService struct {
 	accountsv1.UnimplementedAccountServiceServer
-	accounts      *accounts.Service
-	createAccount *idempotency.Runner[domain.Account]
+	accounts           *accounts.Service
+	idempotencyService *idempotency.Service
 }
 
 func newAccountService(
 	accountsService *accounts.Service,
-	createAccount *idempotency.Runner[domain.Account],
+	idempotencyService *idempotency.Service,
 ) *accountService {
 	return &accountService{
-		accounts:      accountsService,
-		createAccount: createAccount,
+		accounts:           accountsService,
+		idempotencyService: idempotencyService,
 	}
 }
 
@@ -44,8 +44,8 @@ func (s *accountService) CreateAccount(
 	if err != nil {
 		return nil, err
 	}
-	
-	account, replayed, err := s.createAccount.Do(ctx, key, func(ctx context.Context) (domain.Account, error) {
+
+	account, replayed, err := s.idempotencyService.Execute(ctx, key, func(ctx context.Context) (domain.Account, error) {
 		return s.accounts.CreateAccount(ctx, accounts.CreateAccountParams{
 			UserID:      req.GetUserId(),
 			Name:        req.GetName(),

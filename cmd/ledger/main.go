@@ -15,7 +15,6 @@ import (
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
 	"github.com/dyingvoid/ledger/internal/core/idempotency"
-	"github.com/dyingvoid/ledger/internal/domain"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres/repositories"
 	transportgrpc "github.com/dyingvoid/ledger/internal/transport/grpc"
@@ -62,7 +61,7 @@ func run() error {
 		return fmt.Errorf("loading grpc config: %w", err)
 	}
 
-	server, err := transportgrpc.NewServer(grpcCfg, services.accounts, services.createAccount)
+	server, err := transportgrpc.NewServer(grpcCfg, services.accounts, services.idempotencyService)
 	if err != nil {
 		return fmt.Errorf("creating grpc server: %w", err)
 	}
@@ -71,8 +70,8 @@ func run() error {
 }
 
 type services struct {
-	accounts      *accounts.Service
-	createAccount *idempotency.Runner[domain.Account]
+	accounts           *accounts.Service
+	idempotencyService *idempotency.Service
 }
 
 func newServices(pool *pgxpool.Pool) (*services, error) {
@@ -87,8 +86,8 @@ func newServices(pool *pgxpool.Pool) (*services, error) {
 	idempotencyService := idempotency.NewService(idempotencyStore, unitOfWork, idempotencyCfg)
 
 	return &services{
-		accounts:      accounts.NewService(accountRepository),
-		createAccount: idempotency.NewRunner[domain.Account](idempotencyService),
+		accounts:           accounts.NewService(accountRepository),
+		idempotencyService: idempotencyService,
 	}, nil
 }
 

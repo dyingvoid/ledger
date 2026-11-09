@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,18 +19,6 @@ type Idempotency struct {
 
 func NewIdempotency(pool *pgxpool.Pool) *Idempotency {
 	return &Idempotency{defaultExecutor: pool}
-}
-
-func (r *Idempotency) Lock(ctx context.Context, key string) error {
-	_, err := r.executor(ctx).Exec(
-		ctx,
-		`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
-		key,
-	)
-	if err != nil {
-		return fmt.Errorf("acquiring idempotency lock: %w", err)
-	}
-	return nil
 }
 
 func (r *Idempotency) Get(ctx context.Context, key string) (idempotency.Record, bool, error) {
@@ -57,30 +46,61 @@ func (r *Idempotency) Get(ctx context.Context, key string) (idempotency.Record, 
 	return record, true, nil
 }
 
-func (r *Idempotency) Save(ctx context.Context, record idempotency.Record) error {
+func (r *Idempotency) Claim(ctx context.Context, key string, expiresAt time.Time) (bool, error) {
+	var claimedKey string
+	err := r.executor(ctx).QueryRow(
+		ctx,
+		`INSERT INTO ledger.idempotency (key, status, result, error, expires_at)
+		 VALUES ($1, $2, NULL, '', $3)
+		 ON CONFLICT (key) DO UPDATE
+		 SET status = EXCLUDED.status,
+		     result = NULL,
+		     error = '',
+		     expires_at = EXCLUDED.expires_at,
+		     updated_at = now()
+		 WHERE ledger.idempotency.expires_at <= now()
+		 RETURNING key`,
+		key,
+		string(idempotency.StatusInProgress),
+		expiresAt,
+	).Scan(&claimedKey)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("claiming idempotency record: %w", err)
+	}
+	return true, nil
+}
+
+func (r *Idempotency) Complete(ctx context.Context, record idempotency.Record) error {
 	var result any
 	if record.Result != nil {
 		result = string(record.Result)
 	}
 
-	_, err := r.executor(ctx).Exec(
+	tag, err := r.executor(ctx).Exec(
 		ctx,
-		`INSERT INTO ledger.idempotency (key, status, result, error, expires_at)
-		 VALUES ($1, $2, $3::jsonb, $4, $5)
-		 ON CONFLICT (key) DO UPDATE
-		 SET status = EXCLUDED.status,
-		     result = EXCLUDED.result,
-		     error = EXCLUDED.error,
-		     expires_at = EXCLUDED.expires_at,
-		     updated_at = now()`,
+		`UPDATE ledger.idempotency
+		 SET status = $2,
+		     result = $3::jsonb,
+		     error = $4,
+		     expires_at = $5,
+		     updated_at = now()
+		 WHERE key = $1
+		   AND status = $6`,
 		record.Key,
 		string(record.Status),
 		result,
 		record.Error,
 		record.ExpiresAt,
+		string(idempotency.StatusInProgress),
 	)
 	if err != nil {
-		return fmt.Errorf("saving idempotency record: %w", err)
+		return fmt.Errorf("completing idempotency record: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("completing idempotency record: %w", idempotency.ErrRecordNotFound)
 	}
 	return nil
 }

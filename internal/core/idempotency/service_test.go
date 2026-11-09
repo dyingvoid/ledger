@@ -9,21 +9,32 @@ import (
 )
 
 type fakeStore struct {
-	records   map[string]Record
-	lockCalls int
-	saveCalls int
-	lockErr   error
-	getErr    error
-	saveErr   error
+	records       map[string]Record
+	claimCalls    int
+	completeCalls int
+	claimErr      error
+	getErr        error
+	completeErr   error
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{records: make(map[string]Record)}
 }
 
-func (f *fakeStore) Lock(_ context.Context, _ string) error {
-	f.lockCalls++
-	return f.lockErr
+func (f *fakeStore) Claim(_ context.Context, key string, expiresAt time.Time) (bool, error) {
+	f.claimCalls++
+	if f.claimErr != nil {
+		return false, f.claimErr
+	}
+	if record, ok := f.records[key]; ok && record.ExpiresAt.After(time.Now()) {
+		return false, nil
+	}
+	f.records[key] = Record{
+		Key:       key,
+		Status:    StatusInProgress,
+		ExpiresAt: expiresAt,
+	}
+	return true, nil
 }
 
 func (f *fakeStore) Get(_ context.Context, key string) (Record, bool, error) {
@@ -37,10 +48,10 @@ func (f *fakeStore) Get(_ context.Context, key string) (Record, bool, error) {
 	return record, true, nil
 }
 
-func (f *fakeStore) Save(_ context.Context, record Record) error {
-	f.saveCalls++
-	if f.saveErr != nil {
-		return f.saveErr
+func (f *fakeStore) Complete(_ context.Context, record Record) error {
+	f.completeCalls++
+	if f.completeErr != nil {
+		return f.completeErr
 	}
 	f.records[record.Key] = record
 	return nil
@@ -68,7 +79,7 @@ func TestExecuteSuccess(t *testing.T) {
 	service := newTestService(t, store, uow)
 
 	var calls int
-	result, replayed, err := service.Execute(
+	result, replayed, err := service.execute(
 		context.Background(),
 		"create_account:1",
 		func(context.Context) ([]byte, error) {
@@ -87,9 +98,6 @@ func TestExecuteSuccess(t *testing.T) {
 	}
 	if string(result) != `{"id":1}` {
 		t.Fatalf("result = %s, want %s", result, `{"id":1}`)
-	}
-	if store.lockCalls != 1 {
-		t.Fatalf("Lock() calls = %d, want 1", store.lockCalls)
 	}
 	if uow.calls != 2 {
 		t.Fatalf("WithinTransaction() calls = %d, want 2", uow.calls)
@@ -120,7 +128,7 @@ func TestExecuteReplaysSuccess(t *testing.T) {
 	uow := &fakeUnitOfWork{}
 	service := newTestService(t, store, uow)
 
-	result, replayed, err := service.Execute(
+	result, replayed, err := service.execute(
 		context.Background(),
 		"deposit:7",
 		func(context.Context) ([]byte, error) {
@@ -137,8 +145,8 @@ func TestExecuteReplaysSuccess(t *testing.T) {
 	if string(result) != `{"journal_entry_id":9}` {
 		t.Fatalf("result = %s, want %s", result, `{"journal_entry_id":9}`)
 	}
-	if store.saveCalls != 0 {
-		t.Fatalf("Save() calls = %d, want 0", store.saveCalls)
+	if store.completeCalls != 0 {
+		t.Fatalf("Complete() calls = %d, want 0", store.completeCalls)
 	}
 }
 
@@ -154,7 +162,7 @@ func TestExecuteReplaysFailure(t *testing.T) {
 	}
 	service := newTestService(t, store, &fakeUnitOfWork{})
 
-	_, _, err := service.Execute(
+	_, _, err := service.execute(
 		context.Background(),
 		"deposit:8",
 		func(context.Context) ([]byte, error) {
@@ -177,7 +185,7 @@ func TestExecuteRecordsFailure(t *testing.T) {
 	service := newTestService(t, store, &fakeUnitOfWork{})
 	businessErr := errors.New("insufficient funds")
 
-	result, replayed, err := service.Execute(
+	result, replayed, err := service.execute(
 		context.Background(),
 		"deposit:9",
 		func(context.Context) ([]byte, error) {
@@ -219,7 +227,7 @@ func TestExecuteReclaimsExpiredRecord(t *testing.T) {
 	service := newTestService(t, store, &fakeUnitOfWork{})
 
 	var calls int
-	result, replayed, err := service.Execute(
+	result, replayed, err := service.execute(
 		context.Background(),
 		"create_account:2",
 		func(context.Context) ([]byte, error) {
@@ -261,7 +269,7 @@ func TestExecuteValidatesKey(t *testing.T) {
 			store := newFakeStore()
 			service := newTestService(t, store, &fakeUnitOfWork{})
 
-			_, _, err := service.Execute(
+			_, _, err := service.execute(
 				context.Background(),
 				test.key,
 				func(context.Context) ([]byte, error) {
@@ -272,34 +280,52 @@ func TestExecuteValidatesKey(t *testing.T) {
 			if !errors.Is(err, test.want) {
 				t.Fatalf("Execute() error = %v, want %v", err, test.want)
 			}
-			if store.lockCalls != 0 {
-				t.Fatalf("Lock() calls = %d, want 0", store.lockCalls)
-			}
 		})
 	}
 }
 
-func TestExecuteReturnsSaveError(t *testing.T) {
+func TestExecuteReturnsClaimError(t *testing.T) {
 	t.Parallel()
 
-	saveErr := errors.New("database unavailable")
+	claimErr := errors.New("database unavailable")
 	store := newFakeStore()
-	store.saveErr = saveErr
+	store.claimErr = claimErr
 	service := newTestService(t, store, &fakeUnitOfWork{})
 
-	_, _, err := service.Execute(
+	_, _, err := service.execute(
+		context.Background(),
+		"create_account:3",
+		func(context.Context) ([]byte, error) {
+			t.Fatal("business logic must not run when claiming fails")
+			return nil, nil
+		},
+	)
+	if !errors.Is(err, claimErr) {
+		t.Fatalf("Execute() error = %v, want %v", err, claimErr)
+	}
+}
+
+func TestExecuteReturnsCompleteError(t *testing.T) {
+	t.Parallel()
+
+	completeErr := errors.New("database unavailable")
+	store := newFakeStore()
+	store.completeErr = completeErr
+	service := newTestService(t, store, &fakeUnitOfWork{})
+
+	_, _, err := service.execute(
 		context.Background(),
 		"create_account:3",
 		func(context.Context) ([]byte, error) {
 			return []byte(`{"id":3}`), nil
 		},
 	)
-	if !errors.Is(err, saveErr) {
-		t.Fatalf("Execute() error = %v, want %v", err, saveErr)
+	if !errors.Is(err, completeErr) {
+		t.Fatalf("Execute() error = %v, want %v", err, completeErr)
 	}
 }
 
-func TestRunnerRoundTripsValue(t *testing.T) {
+func TestExecuteRoundTripsValue(t *testing.T) {
 	t.Parallel()
 
 	type result struct {
@@ -309,9 +335,8 @@ func TestRunnerRoundTripsValue(t *testing.T) {
 
 	store := newFakeStore()
 	service := newTestService(t, store, &fakeUnitOfWork{})
-	runner := NewRunner[result](service)
 
-	first, replayed, err := runner.Do(
+	first, replayed, err := service.Execute(
 		context.Background(),
 		"create_account:4",
 		func(context.Context) (result, error) {
@@ -319,16 +344,16 @@ func TestRunnerRoundTripsValue(t *testing.T) {
 		},
 	)
 	if err != nil {
-		t.Fatalf("Do() error = %v", err)
+		t.Fatalf("Execute() error = %v", err)
 	}
 	if replayed {
-		t.Fatal("Do() replayed = true, want false")
+		t.Fatal("Execute() replayed = true, want false")
 	}
 	if first.ID != 4 || first.Name != "Daily" {
-		t.Fatalf("Do() = %+v, want %+v", first, result{ID: 4, Name: "Daily"})
+		t.Fatalf("Execute() = %+v, want %+v", first, result{ID: 4, Name: "Daily"})
 	}
 
-	second, replayed, err := runner.Do(
+	second, replayed, err := service.Execute(
 		context.Background(),
 		"create_account:4",
 		func(context.Context) (result, error) {
@@ -337,12 +362,12 @@ func TestRunnerRoundTripsValue(t *testing.T) {
 		},
 	)
 	if err != nil {
-		t.Fatalf("Do() error = %v", err)
+		t.Fatalf("Execute() error = %v", err)
 	}
 	if !replayed {
-		t.Fatal("Do() replayed = false, want true")
+		t.Fatal("Execute() replayed = false, want true")
 	}
 	if second != first {
-		t.Fatalf("Do() = %+v, want %+v", second, first)
+		t.Fatalf("Execute() = %+v, want %+v", second, first)
 	}
 }

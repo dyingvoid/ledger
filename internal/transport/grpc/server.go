@@ -10,7 +10,6 @@ import (
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
 	"github.com/dyingvoid/ledger/internal/core/idempotency"
-	"github.com/dyingvoid/ledger/internal/domain"
 	accountsv1 "github.com/dyingvoid/ledger/pkg/proto/ledger/accounts/v1"
 )
 
@@ -22,7 +21,7 @@ type Server struct {
 func NewServer(
 	cfg Config,
 	accountsService *accounts.Service,
-	createAccount *idempotency.Runner[domain.Account],
+	idempotencyService *idempotency.Service,
 ) (*Server, error) {
 	listener, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
@@ -30,7 +29,7 @@ func NewServer(
 	}
 
 	server := grpcpkg.NewServer()
-	accountsv1.RegisterAccountServiceServer(server, newAccountService(accountsService, createAccount))
+	accountsv1.RegisterAccountServiceServer(server, newAccountService(accountsService, idempotencyService))
 
 	return &Server{server: server, listener: listener}, nil
 }

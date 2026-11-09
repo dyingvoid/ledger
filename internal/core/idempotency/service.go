@@ -2,6 +2,7 @@ package idempotency
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -22,7 +23,37 @@ func NewService(store Store, uow UnitOfWork, cfg Config) *Service {
 	return &Service{store: store, uow: uow, ttl: ttl}
 }
 
-func (s *Service) Execute(
+func (s *Service) Execute[T any](
+	ctx context.Context,
+	key string,
+	fn func(ctx context.Context) (T, error),
+) (T, bool, error) {
+	var zero T
+
+	raw, replayed, err := s.execute(ctx, key, func(ctx context.Context) ([]byte, error) {
+		value, err := fn(ctx)
+		if err != nil {
+			return nil, err
+		}
+		data, err := json.Marshal(value)
+		if err != nil {
+			return nil, fmt.Errorf("marshalling idempotent result: %w", err)
+		}
+		return data, nil
+	})
+	if err != nil {
+		return zero, replayed, err
+	}
+
+	var value T
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return zero, replayed, fmt.Errorf("unmarshalling idempotent result: %w", err)
+	}
+
+	return value, replayed, nil
+}
+
+func (s *Service) execute(
 	ctx context.Context,
 	key string,
 	fn func(ctx context.Context) ([]byte, error),
@@ -38,15 +69,18 @@ func (s *Service) Execute(
 	)
 
 	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := s.store.Lock(txCtx, key); err != nil {
-			return fmt.Errorf("locking idempotency key: %w", err)
-		}
-
-		record, found, err := s.store.Get(txCtx, key)
+		claimed, err := s.store.Claim(txCtx, key, s.expiresAt())
 		if err != nil {
-			return fmt.Errorf("reading idempotency record: %w", err)
+			return fmt.Errorf("claiming idempotency key: %w", err)
 		}
-		if found {
+		if !claimed {
+			record, found, err := s.store.Get(txCtx, key)
+			if err != nil {
+				return fmt.Errorf("reading idempotency record: %w", err)
+			}
+			if !found {
+				return fmt.Errorf("%w: %q", ErrRecordNotFound, key)
+			}
 			switch record.Status {
 			case StatusSuccess:
 				result = record.Result
@@ -74,8 +108,8 @@ func (s *Service) Execute(
 				Error:     businessErr.Error(),
 				ExpiresAt: s.expiresAt(),
 			}
-			if err := s.store.Save(txCtx, failed); err != nil {
-				return errors.Join(businessErr, fmt.Errorf("saving failed idempotency record: %w", err))
+			if err := s.store.Complete(txCtx, failed); err != nil {
+				return errors.Join(businessErr, fmt.Errorf("completing failed idempotency record: %w", err))
 			}
 			return nil
 		}
@@ -86,8 +120,8 @@ func (s *Service) Execute(
 			Result:    result,
 			ExpiresAt: s.expiresAt(),
 		}
-		if err := s.store.Save(txCtx, succeeded); err != nil {
-			return fmt.Errorf("saving idempotency record: %w", err)
+		if err := s.store.Complete(txCtx, succeeded); err != nil {
+			return fmt.Errorf("completing idempotency record: %w", err)
 		}
 		return nil
 	})

@@ -3,7 +3,7 @@ export
 
 APP := ledger
 
-.PHONY: run build test fmt vet lint lint-fix tidy \
+.PHONY: run build test test-integration fmt vet lint lint-fix tidy \
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
 	migrate-up migrate-down migrate-action migrate-create \
@@ -17,6 +17,9 @@ build:
 
 test:
 	@go test -race ./...
+
+test-integration:
+	@go test -race -tags integration ./integration/...
 
 fmt:
 	@gofmt -s -w .

@@ -13,13 +13,15 @@ var (
 	ErrKeyTooLong            = errors.New("idempotency key is too long")
 	ErrPreviousAttemptFailed = errors.New("previous attempt with this idempotency key failed")
 	ErrUnknownStatus         = errors.New("unknown idempotency status")
+	ErrRecordNotFound        = errors.New("idempotency record not found")
 )
 
 type Status string
 
 const (
-	StatusSuccess Status = "success"
-	StatusFail    Status = "fail"
+	StatusInProgress Status = "in_progress"
+	StatusSuccess    Status = "success"
+	StatusFail       Status = "fail"
 )
 
 type Record struct {
@@ -31,9 +33,9 @@ type Record struct {
 }
 
 type Store interface {
-	Lock(ctx context.Context, key string) error
+	Claim(ctx context.Context, key string, expiresAt time.Time) (bool, error)
 	Get(ctx context.Context, key string) (Record, bool, error)
-	Save(ctx context.Context, record Record) error
+	Complete(ctx context.Context, record Record) error
 }
 
 type UnitOfWork interface {

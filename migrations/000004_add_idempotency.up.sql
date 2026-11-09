@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE TABLE ledger.idempotency (
     key TEXT PRIMARY KEY CHECK (length(key) BETWEEN 1 AND 255),
-    status TEXT NOT NULL CHECK (status IN ('success', 'fail')),
+    status TEXT NOT NULL CHECK (status IN ('in_progress', 'success', 'fail')),
     result JSONB,
     error TEXT NOT NULL DEFAULT '',
     expires_at TIMESTAMPTZ NOT NULL,
