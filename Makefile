@@ -2,12 +2,18 @@
 export
 
 APP := ledger
+MIGRATE_LOCK_TIMEOUT ?= 5
+RATE ?= 6
+DURATION ?= 5m
 
-.PHONY: run build test fmt vet lint lint-fix tidy \
+.PHONY: run build test test-integration fmt vet lint lint-fix tidy \
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
 	tigerbeetle-up tigerbeetle-down tigerbeetle-logs \
 	migrate-up migrate-down migrate-action migrate-create
+	migrate-up migrate-down migrate-action migrate-create \
+	proto-gen proto-lint \
+	loadtest-deposit loadtest-matrix
 
 run:
 	@go run ./cmd/$(APP)
@@ -17,6 +23,9 @@ build:
 
 test:
 	@go test -race ./...
+
+test-integration:
+	@go test -race -tags integration ./integration/...
 
 fmt:
 	@gofmt -s -w .
@@ -74,6 +83,7 @@ migrate-action:
 	@docker compose run --rm migrate \
 		-path /migrations \
 		-database "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable" \
+		-lock-timeout $(MIGRATE_LOCK_TIMEOUT) \
 		"$(action)"
 
 migrate-create:
@@ -86,3 +96,19 @@ migrate-create:
 		-ext sql \
 		-dir /migrations \
 		-seq "$(seq)"
+
+proto-gen:
+	@cd proto && buf generate
+
+proto-lint:
+	@cd proto && buf lint
+
+loadtest-deposit:
+	@set -a; . ./.env; [ -f loadtest/seed.env ] && . ./loadtest/seed.env; set +a; \
+		k6 run -e RATE=$(RATE) -e DURATION=$(DURATION) \
+			-e ACCOUNT_MIN_ID=$${ACCOUNT_MIN_ID:-4} \
+			-e ACCOUNT_COUNT=$${ACCOUNT_COUNT:-15000000} \
+			loadtest/deposit.js
+
+loadtest-matrix:
+	@./loadtest/run-matrix.sh

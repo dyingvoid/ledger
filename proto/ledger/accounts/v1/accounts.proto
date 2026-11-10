@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package ledger.accounts.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/dyingvoid/ledger/pkg/proto/ledger/accounts/v1;accountsv1";
+
+service AccountService {
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
+}
+
+message CreateAccountRequest {
+  int64 user_id = 1;
+  string name = 2;
+  string description = 3;
+  int32 type = 4;
+  string currency = 5;
+}
+
+message CreateAccountResponse {
+  Account account = 1;
+  bool replayed = 2;
+}
+
+message Account {
+  int64 id = 1;
+  int64 user_id = 2;
+  string name = 3;
+  string description = 4;
+  int32 type = 5;
+  string currency = 6;
+  int64 debit_minor = 7;
+  int64 credit_minor = 8;
+  google.protobuf.Timestamp created_at = 9;
+}

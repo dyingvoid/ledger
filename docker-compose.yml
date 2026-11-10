@@ -19,18 +19,24 @@ services:
       tigerbeetle:
         condition: service_started
 
+      IDEMPOTENCY_TTL: ${IDEMPOTENCY_TTL:-24h}
+      GRPC_ADDR: ${GRPC_ADDR:-:50051}
+    ports:
+      - "${GRPC_PORT:-50051}:50051"
+
   postgres:
     image: postgres:17.6-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    command: [ "postgres", "-c", "max_connections=${POSTGRES_MAX_CONNS}" ]
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -53,7 +59,9 @@ services:
 
   migrate:
     image: migrate/migrate:v4.19.1
-    profiles: ["migrations"]
+    profiles: [ "migrations" ]
+    environment:
+      PGOPTIONS: "-c lock_timeout=${MIGRATE_LOCK_TIMEOUT:-5}s"
     volumes:
       - ${PROJECT_ROOT:-.}/migrations:/migrations
     depends_on:
@@ -62,9 +70,9 @@ services:
 
   lint:
     image: golangci/golangci-lint:${GOLANGCI_LINT_VERSION:-v2.15.0}
-    profiles: ["lint"]
-    entrypoint: ["golangci-lint"]
-    command: ["run", "./..."]
+    profiles: [ "lint" ]
+    entrypoint: [ "golangci-lint" ]
+    command: [ "run", "./..." ]
     working_dir: /app
     volumes:
       - ${PROJECT_ROOT:-.}:/app
