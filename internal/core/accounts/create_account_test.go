@@ -9,6 +9,11 @@ import (
 	"github.com/dyingvoid/ledger/internal/domain"
 )
 
+const (
+	testAccountName     = "Daily"
+	testAccountCurrency = "USD"
+)
+
 type fakeAccountRepository struct {
 	accountTypeExists bool
 	currencyExists    bool
@@ -56,10 +61,10 @@ func TestCreateAccount(t *testing.T) {
 
 		account, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:      7,
-			Name:        "Daily",
+			Name:        testAccountName,
 			Description: "Spending",
 			Type:        2100,
-			Currency:    "USD",
+			Currency:    testAccountCurrency,
 		})
 		if err != nil {
 			t.Fatalf("CreateAccount() error = %v", err)
@@ -83,9 +88,9 @@ func TestCreateAccount(t *testing.T) {
 
 		_, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:   0,
-			Name:     "Daily",
+			Name:     testAccountName,
 			Type:     2100,
-			Currency: "USD",
+			Currency: testAccountCurrency,
 		})
 		if !errors.Is(err, domain.ErrAccountUserRequired) {
 			t.Fatalf("CreateAccount() error = %v, want %v", err, domain.ErrAccountUserRequired)
@@ -103,9 +108,9 @@ func TestCreateAccount(t *testing.T) {
 
 		_, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:   7,
-			Name:     "Daily",
+			Name:     testAccountName,
 			Type:     2100,
-			Currency: "USD",
+			Currency: testAccountCurrency,
 		})
 		if !errors.Is(err, ErrAccountTypeNotFound) {
 			t.Fatalf("CreateAccount() error = %v, want %v", err, ErrAccountTypeNotFound)
@@ -123,7 +128,7 @@ func TestCreateAccount(t *testing.T) {
 
 		_, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:   7,
-			Name:     "Daily",
+			Name:     testAccountName,
 			Type:     2100,
 			Currency: "EUR",
 		})
@@ -148,9 +153,9 @@ func TestCreateAccount(t *testing.T) {
 
 		_, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:   7,
-			Name:     "Daily",
+			Name:     testAccountName,
 			Type:     2100,
-			Currency: "USD",
+			Currency: testAccountCurrency,
 		})
 		if !errors.Is(err, saveErr) {
 			t.Fatalf("CreateAccount() error = %v, want %v", err, saveErr)

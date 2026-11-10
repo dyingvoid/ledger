@@ -7,10 +7,15 @@ import (
 
 var ErrAccountTypeInvalid = errors.New("account type must be a four digit code between 1000 and 5999")
 
+const (
+	minAccountType AccountType = 1000
+	maxAccountType AccountType = 5999
+)
+
 type AccountType int32
 
 func (t AccountType) Valid() bool {
-	return t >= 1000 && t <= 5999
+	return t >= minAccountType && t <= maxAccountType
 }
 
 func (t AccountType) Validate() error {

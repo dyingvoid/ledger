@@ -3,7 +3,6 @@ package grpc
 import (
 	"bytes"
 	"context"
-	"io"
 	"log/slog"
 	"strings"
 	"testing"
@@ -18,7 +17,7 @@ import (
 func TestLoggerInterceptor(t *testing.T) {
 	t.Parallel()
 
-	base := slog.New(slog.NewTextHandler(io.Discard, nil))
+	base := slog.New(slog.DiscardHandler)
 	interceptor := loggerInterceptor(base)
 
 	_, err := interceptor(

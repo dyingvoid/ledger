@@ -90,14 +90,7 @@ func (s *Service) execute(
 			return fmt.Errorf("claiming idempotency key: %w", err)
 		}
 		if !claimed {
-			existing, err := s.store.Get(txCtx, key)
-			if err != nil {
-				if errors.Is(err, ErrRecordNotFound) {
-					return fmt.Errorf("%w: %q", ErrRecordNotFound, key)
-				}
-				return fmt.Errorf("reading idempotency record: %w", err)
-			}
-			result, replayed, err = replay(existing)
+			result, replayed, err = s.replayClaimed(txCtx, key)
 			return err
 		}
 
@@ -143,12 +136,25 @@ func (s *Service) execute(
 	return result, replayed, nil
 }
 
+func (s *Service) replayClaimed(ctx context.Context, key string) ([]byte, bool, error) {
+	existing, err := s.store.Get(ctx, key)
+	if err != nil {
+		if errors.Is(err, ErrRecordNotFound) {
+			return nil, false, fmt.Errorf("%w: %q", ErrRecordNotFound, key)
+		}
+		return nil, false, fmt.Errorf("reading idempotency record: %w", err)
+	}
+	return replay(existing)
+}
+
 func replay(record Record) ([]byte, bool, error) {
 	switch record.Status {
 	case StatusSuccess:
 		return record.Result, true, nil
 	case StatusFail:
 		return nil, false, fmt.Errorf("%w: %s", ErrPreviousAttemptFailed, record.Error)
+	case StatusInProgress:
+		return nil, false, ErrInProgress
 	default:
 		return nil, false, fmt.Errorf("%w: %q", ErrUnknownStatus, record.Status)
 	}

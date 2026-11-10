@@ -12,6 +12,7 @@ var (
 	ErrKeyRequired           = errors.New("idempotency key is required")
 	ErrKeyTooLong            = errors.New("idempotency key is too long")
 	ErrPreviousAttemptFailed = errors.New("previous attempt with this idempotency key failed")
+	ErrInProgress            = errors.New("idempotency request is still in progress")
 	ErrUnknownStatus         = errors.New("unknown idempotency status")
 	ErrRecordNotFound        = errors.New("idempotency record not found")
 )

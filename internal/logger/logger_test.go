@@ -2,7 +2,6 @@ package logger
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"testing"
 )
@@ -40,7 +39,7 @@ func TestContext(t *testing.T) {
 		t.Fatalf("FromContext() = %p, want default %p", got, slog.Default())
 	}
 
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	log := slog.New(slog.DiscardHandler)
 	ctx = WithContext(ctx, log)
 
 	if got := FromContext(ctx); got != log {

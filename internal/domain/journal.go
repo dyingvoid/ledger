@@ -15,7 +15,7 @@ var (
 )
 
 type JournalEntry struct {
-	ID    string
+	ID    int64
 	Date  time.Time
 	Lines []JournalLine
 }
@@ -88,7 +88,7 @@ func (l JournalLine) Validate() error {
 }
 
 func validateAccountID(id int64) error {
-	if AccountType(id).Valid() {
+	if id >= int64(minAccountType) && id <= int64(maxAccountType) {
 		return nil
 	}
 	return fmt.Errorf("%w: %d", ErrAccountTypeInvalid, id)

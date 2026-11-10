@@ -20,6 +20,8 @@ func toStatus(err error) error {
 		return status.FromContextError(err).Err()
 	case errors.Is(err, idempotency.ErrPreviousAttemptFailed):
 		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, idempotency.ErrInProgress):
+		return status.Error(codes.Aborted, err.Error())
 	case errors.Is(err, domain.ErrDepositAccountNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, idempotency.ErrKeyRequired),

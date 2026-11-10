@@ -50,8 +50,8 @@ func (r *Idempotency) Claim(ctx context.Context, key string, expiresAt time.Time
 	var claimedKey string
 	err := r.executor(ctx).QueryRow(
 		ctx,
-		`INSERT INTO ledger.idempotency (key, status, result, error, expires_at)
-		 VALUES ($1, $2, NULL, NULL, $3)
+		`INSERT INTO ledger.idempotency (key, status, expires_at)
+		 VALUES ($1, $2, $3)
 		 ON CONFLICT (key) DO UPDATE
 		 SET status = EXCLUDED.status,
 		     result = NULL,

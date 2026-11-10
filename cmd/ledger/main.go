@@ -76,6 +76,7 @@ func run() error {
 	}
 
 	server, err := transportgrpc.NewServer(
+		ctx,
 		grpcCfg,
 		log,
 		services.accounts,

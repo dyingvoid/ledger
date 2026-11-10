@@ -23,13 +23,15 @@ type Server struct {
 }
 
 func NewServer(
+	ctx context.Context,
 	cfg Config,
 	log *slog.Logger,
 	accountsService *accounts.Service,
 	depositsService *deposits.Service,
 	idempotencyService *idempotency.Service,
 ) (*Server, error) {
-	listener, err := net.Listen("tcp", cfg.Addr)
+	var listenConfig net.ListenConfig
+	listener, err := listenConfig.Listen(ctx, "tcp", cfg.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("listening on %s: %w", cfg.Addr, err)
 	}
