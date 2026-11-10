@@ -1,0 +1,5 @@
+BEGIN;
+
+DROP FUNCTION ledger.add_deposit(BIGINT, BIGINT, TEXT);
+
+COMMIT;
