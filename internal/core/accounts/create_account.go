@@ -62,7 +62,7 @@ func (s *Service) validateReferenceData(ctx context.Context, account domain.Acco
 		return fmt.Errorf("%w: %d", ErrAccountTypeNotFound, account.Type)
 	}
 
-	currencyExists, err := s.accounts.CurrencyExists(ctx, account.Currency)
+	currencyExists, err := s.currencies.Exists(ctx, account.Currency)
 	if err != nil {
 		return fmt.Errorf("checking currency: %w", err)
 	}

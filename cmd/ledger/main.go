@@ -17,8 +17,8 @@ import (
 	"github.com/dyingvoid/ledger/internal/core/deposits"
 	"github.com/dyingvoid/ledger/internal/core/idempotency"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
-	"github.com/dyingvoid/ledger/internal/infrastructure/tigerbeetle"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres/repositories"
+	"github.com/dyingvoid/ledger/internal/infrastructure/tigerbeetle"
 	"github.com/dyingvoid/ledger/internal/logger"
 	transportgrpc "github.com/dyingvoid/ledger/internal/transport/grpc"
 )
@@ -115,13 +115,14 @@ func newServices(pool *pgxpool.Pool) (*services, error) {
 	}
 
 	accountRepository := repositories.NewAccounts(pool)
+	currencyRepository := repositories.NewCurrencies(pool)
 	depositRepository := repositories.NewDeposits(pool)
 	idempotencyStore := repositories.NewIdempotency(pool)
 	unitOfWork := postgres.NewUnitOfWork(pool)
 	idempotencyService := idempotency.NewService(idempotencyStore, unitOfWork, idempotencyCfg)
 
 	return &services{
-		accounts:           accounts.NewService(accountRepository),
+		accounts:           accounts.NewService(accountRepository, currencyRepository),
 		deposits:           deposits.NewService(depositRepository),
 		idempotencyService: idempotencyService,
 	}, nil

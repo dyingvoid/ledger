@@ -16,7 +16,6 @@ const (
 
 type fakeAccountRepository struct {
 	accountTypeExists bool
-	currencyExists    bool
 	checkErr          error
 	createErr         error
 	created           domain.Account
@@ -30,11 +29,16 @@ func (f *fakeAccountRepository) AccountTypeExists(_ context.Context, _ domain.Ac
 	return f.accountTypeExists, nil
 }
 
-func (f *fakeAccountRepository) CurrencyExists(_ context.Context, _ domain.Currency) (bool, error) {
-	if f.checkErr != nil {
-		return false, f.checkErr
+type fakeCurrencyRepository struct {
+	exists bool
+	err    error
+}
+
+func (f *fakeCurrencyRepository) Exists(_ context.Context, _ domain.Currency) (bool, error) {
+	if f.err != nil {
+		return false, f.err
 	}
-	return f.currencyExists, nil
+	return f.exists, nil
 }
 
 func (f *fakeAccountRepository) Create(_ context.Context, account domain.Account) (domain.Account, error) {
@@ -56,8 +60,8 @@ func TestCreateAccount(t *testing.T) {
 	t.Run("creates a valid account", func(t *testing.T) {
 		t.Parallel()
 
-		repository := &fakeAccountRepository{accountTypeExists: true, currencyExists: true}
-		service := NewService(repository)
+		repository := &fakeAccountRepository{accountTypeExists: true}
+		service := NewService(repository, &fakeCurrencyRepository{exists: true})
 
 		account, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:      7,
@@ -83,8 +87,8 @@ func TestCreateAccount(t *testing.T) {
 	t.Run("rejects invalid account before checking the database", func(t *testing.T) {
 		t.Parallel()
 
-		repository := &fakeAccountRepository{accountTypeExists: true, currencyExists: true}
-		service := NewService(repository)
+		repository := &fakeAccountRepository{accountTypeExists: true}
+		service := NewService(repository, &fakeCurrencyRepository{exists: true})
 
 		_, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:   0,
@@ -103,8 +107,8 @@ func TestCreateAccount(t *testing.T) {
 	t.Run("rejects unknown account type", func(t *testing.T) {
 		t.Parallel()
 
-		repository := &fakeAccountRepository{accountTypeExists: false, currencyExists: true}
-		service := NewService(repository)
+		repository := &fakeAccountRepository{accountTypeExists: false}
+		service := NewService(repository, &fakeCurrencyRepository{exists: true})
 
 		_, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:   7,
@@ -123,8 +127,8 @@ func TestCreateAccount(t *testing.T) {
 	t.Run("rejects unknown currency", func(t *testing.T) {
 		t.Parallel()
 
-		repository := &fakeAccountRepository{accountTypeExists: true, currencyExists: false}
-		service := NewService(repository)
+		repository := &fakeAccountRepository{accountTypeExists: true}
+		service := NewService(repository, &fakeCurrencyRepository{exists: false})
 
 		_, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:   7,
@@ -146,10 +150,9 @@ func TestCreateAccount(t *testing.T) {
 		saveErr := errors.New("database unavailable")
 		repository := &fakeAccountRepository{
 			accountTypeExists: true,
-			currencyExists:    true,
 			createErr:         saveErr,
 		}
-		service := NewService(repository)
+		service := NewService(repository, &fakeCurrencyRepository{exists: true})
 
 		_, err := service.CreateAccount(context.Background(), CreateAccountParams{
 			UserID:   7,

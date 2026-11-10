@@ -31,19 +31,6 @@ func (r *Accounts) AccountTypeExists(ctx context.Context, accountType domain.Acc
 	return exists, nil
 }
 
-func (r *Accounts) CurrencyExists(ctx context.Context, currency domain.Currency) (bool, error) {
-	var exists bool
-	err := r.executor(ctx).QueryRow(
-		ctx,
-		`SELECT EXISTS (SELECT 1 FROM ledger.currency WHERE code = $1)`,
-		string(currency),
-	).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("checking currency: %w", err)
-	}
-	return exists, nil
-}
-
 func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.Account, error) {
 	err := r.executor(ctx).QueryRow(
 		ctx,

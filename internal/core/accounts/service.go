@@ -8,14 +8,18 @@ import (
 
 type AccountRepository interface {
 	AccountTypeExists(ctx context.Context, accountType domain.AccountType) (bool, error)
-	CurrencyExists(ctx context.Context, currency domain.Currency) (bool, error)
 	Create(ctx context.Context, account domain.Account) (domain.Account, error)
 }
 
-type Service struct {
-	accounts AccountRepository
+type CurrencyRepository interface {
+	Exists(ctx context.Context, currency domain.Currency) (bool, error)
 }
 
-func NewService(accounts AccountRepository) *Service {
-	return &Service{accounts: accounts}
+type Service struct {
+	accounts   AccountRepository
+	currencies CurrencyRepository
+}
+
+func NewService(accounts AccountRepository, currencies CurrencyRepository) *Service {
+	return &Service{accounts: accounts, currencies: currencies}
 }
