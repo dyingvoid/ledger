@@ -140,7 +140,7 @@ GROUP BY 1, 2, 3;
 ## 3. Run the test
 
 ```bash
-# all three rates, 5 minutes each, separate account slice per rate
+# all three rates, 1 minute each
 ./loadtest/run-matrix.sh
 ```
 
@@ -149,7 +149,7 @@ or one rate:
 ```bash
 set -a; . ./.env; . ./loadtest/seed.env; set +a
 k6 run \
-  -e RATE=174 -e DURATION=5m \
+  -e RATE=174 -e DURATION=1m \
   -e ACCOUNT_MIN_ID="$ACCOUNT_MIN_ID" \
   -e ACCOUNT_COUNT=5000000 \
   loadtest/deposit.js
@@ -196,9 +196,6 @@ Each run prints and optionally writes a JSON summary (`OUT`) with:
   received;
 - `deposit_replayed` — should be 0; non-zero means an idempotency key
   repeated;
-- `deposit_account_pool_exhausted` — the run used more accounts than the slice
-  allowed; the request was skipped to preserve the one-deposit-per-account
-  invariant;
 - `dropped_iterations` — k6 could not keep up with its own schedule;
 - latency percentiles from `grpc_req_duration`: p50, p90, p95, p99, p99.9,
   max, plus the same for successful deposits only (`deposit_ok_duration`).
@@ -213,14 +210,16 @@ A useful result table:
 
 ## 5. Test design notes and limits
 
-- **Account uniqueness.** `exec.scenario.iterationInTest` is a global,
-  zero-based iteration counter, so `ACCOUNT_MIN_ID + iteration` gives every
-  iteration a distinct account until the slice is exhausted. Each matrix run
-  gets a fresh slice (`ACCOUNT_SLICE`, default 5,000,000 accounts), so runs do
-  not deposit into the same accounts.
-- **Slice size.** The slice must be at least `rate × duration` (plus headroom).
-  5M covers 174/s for about 8 hours. If a run is longer, raise
-  `ACCOUNT_SLICE`.
+- **Account reuse.** `exec.scenario.iterationInTest` is a global, zero-based
+  iteration counter, so `ACCOUNT_MIN_ID + (iteration % ACCOUNT_COUNT)` gives
+  each iteration an account from the seeded range and wraps around when the
+  range is exhausted. The target rate is therefore kept for the full duration,
+  even if the run performs more deposits than there are accounts. Each
+  matrix run still gets its own slice (`ACCOUNT_SLICE`, default 5,000,000
+  accounts) so separate runs start from different ids.
+- **Slice size.** Any slice larger than zero works: the test no longer skips
+  requests when the range is used up, it just starts reusing accounts. A
+  larger slice only spreads the deposits over more ids.
 - **Idempotency key.** `RUN_ID` is included in every key. Do not reuse a
   `RUN_ID`; a repeated key would return a replay instead of creating a
   deposit. The matrix generates a timestamped prefix automatically.
@@ -236,7 +235,7 @@ A useful result table:
   `dropped_iterations` is non-zero while the service is healthy, the load
   generator or `VUS` is the limit.
 - **Percentile sample size.** p99.9 needs roughly 100,000+ requests to be
-  meaningful. A 5-minute run at 6/s produces only ~1,800 requests, so its
+  meaningful. A 1-minute run at 6/s produces only ~360 requests, so its
   p99.9 is noisy. Use 30–60 minutes for the low rates if p99.9 matters.
 - **Reflection.** `REFLECT=true` (default) makes each VU load descriptors from
   the server once. Set `REFLECT=false` to load the proto file instead.

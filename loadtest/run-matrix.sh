@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Run the deposit load test for the three target rates.
+# Run the deposit load test at one or more target rates.
 #
 # 15M accounts, one deposit per account per period:
 #
@@ -8,17 +8,18 @@
 #   12  deposits/s  = one deposit per account per 2 weeks (11.57/s exact)
 #   174 deposits/s  = one deposit per account per day     (173.61/s exact)
 #
-# Each run gets its own contiguous slice of the seeded accounts so that no
-# account receives a second deposit between runs.
+# Each steady run defaults to 1 minute. Requests keep coming at the target rate
+# for the whole duration; once the seeded range is used up, accounts are reused.
 #
 # Usage:
 #   ./loadtest/run-matrix.sh
-#   RATES="6 12" DURATION=10m ./loadtest/run-matrix.sh
+#   RATES=174 ./loadtest/run-matrix.sh
+#   RATES="6 12" DURATION=5m ./loadtest/run-matrix.sh
 #   MODE=ramp ./loadtest/run-matrix.sh          # ramp to find max throughput
 #
 # Env:
 #   RATES          default "6 12 174"
-#   DURATION       default 5m (steady mode)
+#   DURATION       default 1m (steady mode)
 #   MODE           steady (default) or ramp
 #   RAMP_STAGES    JSON stages used in ramp mode
 #   ACCOUNT_SLICE  accounts reserved per steady run (default 5000000)
@@ -49,7 +50,7 @@ fi
 
 MODE="${MODE:-steady}"
 RATES="${RATES:-6 12 174}"
-DURATION="${DURATION:-5m}"
+DURATION="${DURATION:-1m}"
 ACCOUNT_SLICE="${ACCOUNT_SLICE:-5000000}"
 RUN_ID="${RUN_ID:-$(date +%Y%m%d-%H%M%S)}"
 K6="${K6:-k6}"

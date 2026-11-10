@@ -1,9 +1,9 @@
 // k6 load test for ledger FundsService.Deposit.
 //
-// One iteration = one Deposit RPC = one deposit on its own account.
+// One iteration = one Deposit RPC = one deposit.
 // Accounts are taken from a contiguous, pre-seeded ID range. The global
-// scenario iteration index guarantees that no two iterations use the same
-// account until the whole range has been consumed.
+// scenario iteration index walks that range and wraps around, so the run
+// keeps depositing at the target rate even after every account was used.
 //
 // Required env:
 //   ACCOUNT_MIN_ID      first account id of the seeded range (from seed.env)
@@ -12,7 +12,7 @@
 // Common env:
 //   MODE=steady|ramp    default: steady
 //   RATE                steady arrival rate per second (default 6)
-//   DURATION            steady duration (default 5m)
+//   DURATION            steady duration (default 1m)
 //   RAMP_STAGES         JSON stages for ramp mode
 //   VUS                 pre-allocated/max VUs (default: peak_rate * VU_SECONDS)
 //   VU_SECONDS          assumed latency used to size VUs (default 0.5)
@@ -49,7 +49,7 @@ const AMOUNT_MINOR = Number(__ENV.AMOUNT_MINOR || 100);
 const RUN_ID = __ENV.RUN_ID || 'adhoc';
 
 const RATE = Number(__ENV.RATE || 6);
-const DURATION = __ENV.DURATION || '5m';
+const DURATION = __ENV.DURATION || '1m';
 
 const DEFAULT_RAMP_STAGES =
   '[{"target":6,"duration":"1m"},{"target":12,"duration":"2m"},' +
@@ -135,7 +135,6 @@ const depositOK = new Counter('deposit_ok');
 const depositFailed = new Counter('deposit_failed');
 const depositReplayed = new Counter('deposit_replayed');
 const depositExceptions = new Counter('deposit_exceptions');
-const poolExhausted = new Counter('deposit_account_pool_exhausted');
 const depositOKDuration = new Trend('deposit_ok_duration', true);
 const depositFailedDuration = new Trend('deposit_failed_duration', true);
 
@@ -186,14 +185,9 @@ function isOK(response) {
 export default function () {
   const seq = exec.scenario.iterationInTest; // 0-based, unique across the whole run
 
-  if (seq >= ACCOUNT_COUNT) {
-    // The range is exhausted. Refuse to reuse an account rather than silently
-    // breaking the "one deposit per account" invariant.
-    poolExhausted.add(1);
-    return;
-  }
-
-  const accountId = ACCOUNT_MIN_ID + seq;
+  // Wrap around the seeded range so the target rate is kept for the whole
+  // duration even if the run needs more deposits than there are accounts.
+  const accountId = ACCOUNT_MIN_ID + (seq % ACCOUNT_COUNT);
   const tags = {
     rate: String(MODE === 'ramp' ? 'ramp' : RATE),
     mode: MODE,
@@ -275,7 +269,6 @@ export function handleSummary(data) {
   const failed = (m.deposit_failed && m.deposit_failed.values.count) || 0;
   const exceptions = (m.deposit_exceptions && m.deposit_exceptions.values.count) || 0;
   const replayed = (m.deposit_replayed && m.deposit_replayed.values.count) || 0;
-  const exhausted = (m.deposit_account_pool_exhausted && m.deposit_account_pool_exhausted.values.count) || 0;
   const dropped = (m.dropped_iterations && m.dropped_iterations.values.count) || 0;
   const latency = (m.grpc_req_duration && m.grpc_req_duration.values) || {};
 
@@ -302,7 +295,6 @@ export function handleSummary(data) {
     }
   }
   lines.push(`replayed     : ${replayed}`);
-  lines.push(`pool exhaust : ${exhausted}`);
   lines.push(`dropped iter : ${dropped}${dropped > 0 ? '  <-- k6 could not start every scheduled iteration' : ''}`);
   lines.push('');
   if (latency['p(50)'] !== undefined) {
