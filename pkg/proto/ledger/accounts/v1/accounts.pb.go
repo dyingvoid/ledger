@@ -161,6 +161,7 @@ type Account struct {
 	DebitMinor    int64                  `protobuf:"varint,7,opt,name=debit_minor,json=debitMinor,proto3" json:"debit_minor,omitempty"`
 	CreditMinor   int64                  `protobuf:"varint,8,opt,name=credit_minor,json=creditMinor,proto3" json:"credit_minor,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	ExternalId    string                 `protobuf:"bytes,10,opt,name=external_id,json=externalId,proto3" json:"external_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -258,6 +259,13 @@ func (x *Account) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Account) GetExternalId() string {
+	if x != nil {
+		return x.ExternalId
+	}
+	return ""
+}
+
 var File_ledger_accounts_v1_accounts_proto protoreflect.FileDescriptor
 
 const file_ledger_accounts_v1_accounts_proto_rawDesc = "" +
@@ -271,7 +279,7 @@ const file_ledger_accounts_v1_accounts_proto_rawDesc = "" +
 	"\bcurrency\x18\x05 \x01(\tR\bcurrency\"j\n" +
 	"\x15CreateAccountResponse\x125\n" +
 	"\aaccount\x18\x01 \x01(\v2\x1b.ledger.accounts.v1.AccountR\aaccount\x12\x1a\n" +
-	"\breplayed\x18\x02 \x01(\bR\breplayed\"\x97\x02\n" +
+	"\breplayed\x18\x02 \x01(\bR\breplayed\"\xb8\x02\n" +
 	"\aAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x12\n" +
@@ -283,7 +291,10 @@ const file_ledger_accounts_v1_accounts_proto_rawDesc = "" +
 	"debitMinor\x12!\n" +
 	"\fcredit_minor\x18\b \x01(\x03R\vcreditMinor\x129\n" +
 	"\n" +
-	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2v\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1f\n" +
+	"\vexternal_id\x18\n" +
+	" \x01(\tR\n" +
+	"externalId2v\n" +
 	"\x0eAccountService\x12d\n" +
 	"\rCreateAccount\x12(.ledger.accounts.v1.CreateAccountRequest\x1a).ledger.accounts.v1.CreateAccountResponseBEZCgithub.com/dyingvoid/ledger/pkg/proto/ledger/accounts/v1;accountsv1b\x06proto3"
 

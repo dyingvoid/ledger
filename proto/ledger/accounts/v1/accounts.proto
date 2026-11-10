@@ -33,4 +33,5 @@ message Account {
   int64 debit_minor = 7;
   int64 credit_minor = 8;
   google.protobuf.Timestamp created_at = 9;
+  string external_id = 10;
 }

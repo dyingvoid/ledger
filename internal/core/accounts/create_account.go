@@ -10,8 +10,12 @@ import (
 )
 
 var (
-	ErrAccountTypeNotFound = errors.New("account type not found")
-	ErrCurrencyNotFound    = errors.New("currency not found")
+	ErrAccountTypeNotFound     = errors.New("account type not found")
+	ErrCurrencyNotFound        = errors.New("currency not found")
+	ErrExternalIDRequired      = errors.New("external account ID is required")
+	ErrAccountIDConflict       = errors.New("external account ID already exists with different data")
+	ErrAccountStoreUnavailable = errors.New("account store unavailable")
+	ErrCurrencyNotConfigured   = errors.New("currency ledger mapping is missing")
 )
 
 type CreateAccountParams struct {
@@ -20,6 +24,7 @@ type CreateAccountParams struct {
 	Description string
 	Type        domain.AccountType
 	Currency    domain.Currency
+	ExternalID  domain.ExternalID
 }
 
 func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams) (domain.Account, error) {
@@ -33,6 +38,8 @@ func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams)
 	if err != nil {
 		return domain.Account{}, fmt.Errorf("validating account: %w", err)
 	}
+
+	account.ExternalID = params.ExternalID
 
 	if err := s.validateReferenceData(ctx, account); err != nil {
 		return domain.Account{}, err
@@ -54,7 +61,7 @@ func (s *Service) CreateAccount(ctx context.Context, params CreateAccountParams)
 }
 
 func (s *Service) validateReferenceData(ctx context.Context, account domain.Account) error {
-	accountTypeExists, err := s.accounts.AccountTypeExists(ctx, account.Type)
+	accountTypeExists, err := s.accountTypes.AccountTypeExists(ctx, account.Type)
 	if err != nil {
 		return fmt.Errorf("checking account type: %w", err)
 	}

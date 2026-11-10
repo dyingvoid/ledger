@@ -36,6 +36,11 @@ func (s *accountService) CreateAccount(
 		return nil, err
 	}
 
+	externalID, err := externalID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	account, replayed, err := s.idempotencyService.Execute(ctx, key, func(ctx context.Context) (domain.Account, error) {
 		return s.accounts.CreateAccount(ctx, accounts.CreateAccountParams{
 			UserID:      req.GetUserId(),
@@ -43,6 +48,7 @@ func (s *accountService) CreateAccount(
 			Description: req.GetDescription(),
 			Type:        domain.AccountType(req.GetType()),
 			Currency:    domain.Currency(req.GetCurrency()),
+			ExternalID:  externalID,
 		})
 	})
 	if err != nil {
@@ -69,6 +75,9 @@ func toProtoAccount(account domain.Account) *accountsv1.Account {
 		Currency:    string(account.Currency),
 		DebitMinor:  account.DebitMinor,
 		CreditMinor: account.CreditMinor,
+	}
+	if !account.ExternalID.IsZero() {
+		response.ExternalId = account.ExternalID.String()
 	}
 	if !account.CreatedAt.IsZero() {
 		response.CreatedAt = timestamppb.New(account.CreatedAt)

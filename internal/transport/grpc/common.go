@@ -9,6 +9,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"github.com/dyingvoid/ledger/internal/domain"
 )
 
 const (
@@ -28,6 +30,29 @@ func idempotencyKey(ctx context.Context, operation string, scope int64) (string,
 	}
 
 	return operation + ":" + strconv.FormatInt(scope, 10) + ":" + strings.TrimSpace(values[0]), nil
+}
+
+func externalID(ctx context.Context) (domain.ExternalID, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return domain.ExternalID{}, status.Errorf(codes.InvalidArgument, "%s metadata is required", idempotencyKeyHeader)
+	}
+
+	values := md.Get(idempotencyKeyHeader)
+	if len(values) == 0 || strings.TrimSpace(values[0]) == "" {
+		return domain.ExternalID{}, status.Errorf(codes.InvalidArgument, "%s metadata is required", idempotencyKeyHeader)
+	}
+
+	value := strings.TrimSpace(values[0])
+	if index := strings.LastIndex(value, ":"); index >= 0 {
+		value = value[index+1:]
+	}
+
+	id, err := domain.ParseExternalID(value)
+	if err != nil {
+		return domain.ExternalID{}, status.Error(codes.InvalidArgument, err.Error())
+	}
+	return id, nil
 }
 
 func setReplayHeader(ctx context.Context, replayed bool) error {

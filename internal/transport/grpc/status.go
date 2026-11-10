@@ -24,6 +24,10 @@ func toStatus(err error) error {
 		return status.Error(codes.Aborted, err.Error())
 	case errors.Is(err, domain.ErrDepositAccountNotFound):
 		return status.Error(codes.NotFound, err.Error())
+	case errors.Is(err, accounts.ErrAccountIDConflict):
+		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.Is(err, accounts.ErrAccountStoreUnavailable):
+		return status.Error(codes.Unavailable, err.Error())
 	case errors.Is(err, idempotency.ErrKeyRequired),
 		errors.Is(err, idempotency.ErrKeyTooLong),
 		errors.Is(err, domain.ErrAccountNameRequired),
@@ -36,7 +40,10 @@ func toStatus(err error) error {
 		errors.Is(err, domain.ErrDepositAccountNotClient),
 		errors.Is(err, domain.ErrDepositCurrencyMismatch),
 		errors.Is(err, accounts.ErrAccountTypeNotFound),
-		errors.Is(err, accounts.ErrCurrencyNotFound):
+		errors.Is(err, accounts.ErrCurrencyNotFound),
+		errors.Is(err, accounts.ErrExternalIDRequired),
+		errors.Is(err, accounts.ErrCurrencyNotConfigured),
+		errors.Is(err, domain.ErrExternalIDInvalid):
 		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())

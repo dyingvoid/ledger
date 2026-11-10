@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
 	"github.com/dyingvoid/ledger/internal/core/deposits"
@@ -19,6 +20,7 @@ import (
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres/repositories"
 	"github.com/dyingvoid/ledger/internal/infrastructure/tigerbeetle"
+	tbrepositories "github.com/dyingvoid/ledger/internal/infrastructure/tigerbeetle/repositories"
 	"github.com/dyingvoid/ledger/internal/logger"
 	transportgrpc "github.com/dyingvoid/ledger/internal/transport/grpc"
 )
@@ -77,7 +79,7 @@ func run() error {
 	}
 	defer tbClient.Close()
 
-	services, err := newServices(pool)
+	services, err := newServices(pool, tbClient)
 	if err != nil {
 		return fmt.Errorf("building services: %w", err)
 	}
@@ -108,21 +110,28 @@ type services struct {
 	idempotencyService *idempotency.Service
 }
 
-func newServices(pool *pgxpool.Pool) (*services, error) {
+const useTigerBeetleAccounts = true
+
+func newServices(pool *pgxpool.Pool, tbClient tigerbeetle_go.Client) (*services, error) {
 	idempotencyCfg, err := idempotency.LoadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("loading idempotency config: %w", err)
 	}
 
-	accountRepository := repositories.NewAccounts(pool)
-	currencyRepository := repositories.NewCurrencies(pool)
+	accountTypes := repositories.NewAccounts(pool)
+	currencies := repositories.NewCurrencies(pool)
 	depositRepository := repositories.NewDeposits(pool)
 	idempotencyStore := repositories.NewIdempotency(pool)
 	unitOfWork := postgres.NewUnitOfWork(pool)
 	idempotencyService := idempotency.NewService(idempotencyStore, unitOfWork, idempotencyCfg)
 
+	var accountWriter accounts.AccountRepository = accountTypes
+	if useTigerBeetleAccounts {
+		accountWriter = tbrepositories.NewAccounts(tbClient, currencies)
+	}
+
 	return &services{
-		accounts:           accounts.NewService(accountRepository, currencyRepository),
+		accounts:           accounts.NewService(accountWriter, accountTypes, currencies),
 		deposits:           deposits.NewService(depositRepository),
 		idempotencyService: idempotencyService,
 	}, nil

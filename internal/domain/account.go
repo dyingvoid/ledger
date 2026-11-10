@@ -13,6 +13,7 @@ var (
 
 type Account struct {
 	ID          int64       `json:"id"`
+	ExternalID  ExternalID  `json:"external_id"`
 	UserID      int64       `json:"user_id"`
 	Name        string      `json:"name"`
 	Description string      `json:"description"`

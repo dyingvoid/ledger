@@ -7,8 +7,11 @@ import (
 )
 
 type AccountRepository interface {
-	AccountTypeExists(ctx context.Context, accountType domain.AccountType) (bool, error)
 	Create(ctx context.Context, account domain.Account) (domain.Account, error)
+}
+
+type AccountTypeRepository interface {
+	AccountTypeExists(ctx context.Context, accountType domain.AccountType) (bool, error)
 }
 
 type CurrencyRepository interface {
@@ -16,10 +19,19 @@ type CurrencyRepository interface {
 }
 
 type Service struct {
-	accounts   AccountRepository
-	currencies CurrencyRepository
+	accounts     AccountRepository
+	accountTypes AccountTypeRepository
+	currencies   CurrencyRepository
 }
 
-func NewService(accounts AccountRepository, currencies CurrencyRepository) *Service {
-	return &Service{accounts: accounts, currencies: currencies}
+func NewService(
+	accounts AccountRepository,
+	accountTypes AccountTypeRepository,
+	currencies CurrencyRepository,
+) *Service {
+	return &Service{
+		accounts:     accounts,
+		accountTypes: accountTypes,
+		currencies:   currencies,
+	}
 }
