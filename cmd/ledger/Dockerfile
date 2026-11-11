@@ -1,4 +1,4 @@
-FROM golang:1.27.3-alpine AS build
+FROM golang:1.27.3-bookworm AS build
 
 WORKDIR /src
 
@@ -7,9 +7,9 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/ledger ./cmd/ledger
+RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/ledger ./cmd/ledger
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/cc-debian12:nonroot
 
 COPY --from=build /out/ledger /ledger
 

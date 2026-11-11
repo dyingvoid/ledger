@@ -4,14 +4,15 @@ export
 APP := ledger
 MIGRATE_LOCK_TIMEOUT ?= 5
 RATE ?= 6
-DURATION ?= 5m
+DURATION ?= 1m
 
-.PHONY: run build test test-integration fmt vet lint lint-fix tidy \
+.PHONY: run build test fmt vet lint lint-fix tidy seed \
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
+	tigerbeetle-up tigerbeetle-down tigerbeetle-logs \
 	migrate-up migrate-down migrate-action migrate-create \
 	proto-gen proto-lint \
-	loadtest-deposit loadtest-matrix
+	loadtest-accounts loadtest-deposit loadtest-matrix
 
 run:
 	@go run ./cmd/$(APP)
@@ -19,11 +20,11 @@ run:
 build:
 	@go build -o bin/$(APP) ./cmd/$(APP)
 
+seed:
+	@go run ./cmd/seed -addr localhost:$(or $(GRPC_PORT),50051)
+
 test:
 	@go test -race ./...
-
-test-integration:
-	@go test -race -tags integration ./integration/...
 
 fmt:
 	@gofmt -s -w .
@@ -57,6 +58,15 @@ postgres-down:
 
 postgres-logs:
 	@docker compose logs -f postgres
+
+tigerbeetle-up:
+	@docker compose up -d --wait tigerbeetle
+
+tigerbeetle-down:
+	@docker compose down
+
+tigerbeetle-logs:
+	@docker compose logs -f tigerbeetle
 
 migrate-up:
 	@$(MAKE) migrate-action action=up
@@ -92,11 +102,22 @@ proto-gen:
 proto-lint:
 	@cd proto && buf lint
 
+loadtest-accounts:
+	@set -a; . ./.env; [ -f loadtest/seed.env ] && . ./loadtest/seed.env; set +a; \
+		k6 run -e DURATION=$(DURATION) -e VUS=$${VUS:-2000} \
+			-e RUN_ID=$${RUN_ID:-$$(date +%Y%m%d-%H%M%S)} \
+			-e ACCOUNT_MIN_ID=$${ACCOUNT_MIN_ID:-1} \
+			-e CURRENCY=$${SEED_CURRENCY:-USD} \
+			loadtest/accounts.js
+
 loadtest-deposit:
 	@set -a; . ./.env; [ -f loadtest/seed.env ] && . ./loadtest/seed.env; set +a; \
-		k6 run -e RATE=$(RATE) -e DURATION=$(DURATION) \
-			-e ACCOUNT_MIN_ID=$${ACCOUNT_MIN_ID:-4} \
+		k6 run -e MODE=$${MODE:-deadline} -e RATE=$(RATE) -e DURATION=$(DURATION) \
+			-e VUS=$${VUS:-2000} \
+			-e RUN_ID=$${RUN_ID:-$$(date +%Y%m%d-%H%M%S)} \
+			-e ACCOUNT_MIN_ID=$${ACCOUNT_MIN_ID:-1} \
 			-e ACCOUNT_COUNT=$${ACCOUNT_COUNT:-15000000} \
+			-e CURRENCY=$${SEED_CURRENCY:-USD} \
 			loadtest/deposit.js
 
 loadtest-matrix:

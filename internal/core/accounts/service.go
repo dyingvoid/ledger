@@ -6,16 +6,20 @@ import (
 	"github.com/dyingvoid/ledger/internal/domain"
 )
 
-type AccountRepository interface {
-	AccountTypeExists(ctx context.Context, accountType domain.AccountType) (bool, error)
-	CurrencyExists(ctx context.Context, currency domain.Currency) (bool, error)
+type InfoRepository interface {
+	Create(ctx context.Context, account domain.Account) (domain.Account, error)
+	Get(ctx context.Context, id domain.ID) (domain.Account, error)
+}
+
+type LedgerRepository interface {
 	Create(ctx context.Context, account domain.Account) (domain.Account, error)
 }
 
 type Service struct {
-	accounts AccountRepository
+	infos  InfoRepository
+	ledger LedgerRepository
 }
 
-func NewService(accounts AccountRepository) *Service {
-	return &Service{accounts: accounts}
+func NewService(infos InfoRepository, ledger LedgerRepository) *Service {
+	return &Service{infos: infos, ledger: ledger}
 }

@@ -12,12 +12,15 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
+	"github.com/dyingvoid/ledger/internal/core/currencies"
 	"github.com/dyingvoid/ledger/internal/core/deposits"
-	"github.com/dyingvoid/ledger/internal/core/idempotency"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres/repositories"
+	"github.com/dyingvoid/ledger/internal/infrastructure/tigerbeetle"
+	tbrepositories "github.com/dyingvoid/ledger/internal/infrastructure/tigerbeetle/repositories"
 	"github.com/dyingvoid/ledger/internal/logger"
 	transportgrpc "github.com/dyingvoid/ledger/internal/transport/grpc"
 )
@@ -65,10 +68,18 @@ func run() error {
 	}
 	defer pool.Close()
 
-	services, err := newServices(pool)
+	tbCfg, err := tigerbeetle.LoadConfig()
 	if err != nil {
-		return fmt.Errorf("building services: %w", err)
+		return fmt.Errorf("loading tigerbeetle config: %w", err)
 	}
+
+	tbClient, err := tigerbeetle.NewClient(tbCfg)
+	if err != nil {
+		return fmt.Errorf("connecting to tigerbeetle: %w", err)
+	}
+	defer tbClient.Close()
+
+	services := newServices(pool, tbClient)
 
 	grpcCfg, err := transportgrpc.LoadConfig()
 	if err != nil {
@@ -80,8 +91,8 @@ func run() error {
 		grpcCfg,
 		log,
 		services.accounts,
+		services.currencies,
 		services.deposits,
-		services.idempotencyService,
 	)
 	if err != nil {
 		return fmt.Errorf("creating grpc server: %w", err)
@@ -91,28 +102,23 @@ func run() error {
 }
 
 type services struct {
-	accounts           *accounts.Service
-	deposits           *deposits.Service
-	idempotencyService *idempotency.Service
+	accounts   *accounts.Service
+	currencies *currencies.Service
+	deposits   *deposits.Service
 }
 
-func newServices(pool *pgxpool.Pool) (*services, error) {
-	idempotencyCfg, err := idempotency.LoadConfig()
-	if err != nil {
-		return nil, fmt.Errorf("loading idempotency config: %w", err)
-	}
+func newServices(pool *pgxpool.Pool, tbClient tigerbeetle_go.Client) *services {
+	currencyInfos := repositories.NewCurrencyInfos(pool)
+	accountInfos := repositories.NewAccounts(pool)
 
-	accountRepository := repositories.NewAccounts(pool)
-	depositRepository := repositories.NewDeposits(pool)
-	idempotencyStore := repositories.NewIdempotency(pool)
-	unitOfWork := postgres.NewUnitOfWork(pool)
-	idempotencyService := idempotency.NewService(idempotencyStore, unitOfWork, idempotencyCfg)
+	accountLedger := tbrepositories.NewAccounts(tbClient, currencyInfos)
+	depositLedger := tbrepositories.NewDeposits(tbClient)
 
 	return &services{
-		accounts:           accounts.NewService(accountRepository),
-		deposits:           deposits.NewService(depositRepository),
-		idempotencyService: idempotencyService,
-	}, nil
+		accounts:   accounts.NewService(accountInfos, accountLedger),
+		currencies: currencies.NewService(currencyInfos),
+		deposits:   deposits.NewService(accountInfos, currencyInfos, depositLedger),
+	}
 }
 
 func serve(ctx context.Context, server *transportgrpc.Server, log *slog.Logger) error {
