@@ -26,9 +26,6 @@ type CreateAccountInfoParams struct {
 	Currency    domain.Currency
 }
 
-// CreateAccountInfo stores the account metadata in Postgres. The ID doubles as
-// the idempotency key: inserting the same ID with the same data returns the
-// existing record, following TigerBeetle's idempotence model.
 func (s *Service) CreateAccountInfo(
 	ctx context.Context,
 	params CreateAccountInfoParams,

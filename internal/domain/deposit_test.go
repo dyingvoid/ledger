@@ -3,6 +3,8 @@ package domain
 import (
 	"errors"
 	"testing"
+
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 const testDepositCurrency Currency = "USD"
@@ -45,7 +47,7 @@ func TestNewDeposit(t *testing.T) {
 			accountID: testID(t, "1"),
 			amount:    2500,
 			currency:  testDepositCurrency,
-			want:      ErrDepositIDRequired,
+			want:      domain_errors.ErrDepositIDRequired,
 		},
 		{
 			name:      "rejects missing account",
@@ -53,7 +55,7 @@ func TestNewDeposit(t *testing.T) {
 			accountID: ID{},
 			amount:    2500,
 			currency:  testDepositCurrency,
-			want:      ErrDepositAccountRequired,
+			want:      domain_errors.ErrDepositAccountRequired,
 		},
 		{
 			name:      "rejects zero amount",
@@ -61,7 +63,7 @@ func TestNewDeposit(t *testing.T) {
 			accountID: testID(t, "1"),
 			amount:    0,
 			currency:  testDepositCurrency,
-			want:      ErrDepositAmountInvalid,
+			want:      domain_errors.ErrDepositAmountInvalid,
 		},
 		{
 			name:      "rejects negative amount",
@@ -69,7 +71,7 @@ func TestNewDeposit(t *testing.T) {
 			accountID: testID(t, "1"),
 			amount:    -2500,
 			currency:  testDepositCurrency,
-			want:      ErrDepositAmountInvalid,
+			want:      domain_errors.ErrDepositAmountInvalid,
 		},
 		{
 			name:      "rejects empty currency",
@@ -77,7 +79,7 @@ func TestNewDeposit(t *testing.T) {
 			accountID: testID(t, "1"),
 			amount:    2500,
 			currency:  "  ",
-			want:      ErrDepositCurrencyRequired,
+			want:      domain_errors.ErrDepositCurrencyRequired,
 		},
 	}
 

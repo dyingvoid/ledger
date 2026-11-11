@@ -1,11 +1,10 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
-)
 
-var ErrAccountTypeInvalid = errors.New("account type must be a four digit code between 1000 and 5999")
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
+)
 
 const (
 	AccountTypeBankCash      AccountType = 1000
@@ -23,7 +22,7 @@ func (t AccountType) Valid() bool {
 
 func (t AccountType) Validate() error {
 	if !t.Valid() {
-		return fmt.Errorf("%w: %d", ErrAccountTypeInvalid, t)
+		return fmt.Errorf("%w: %d", domain_errors.ErrAccountTypeInvalid, t)
 	}
 	return nil
 }
@@ -37,6 +36,6 @@ func (t AccountType) NormalBalance() (BalanceSide, error) {
 	case t >= 5000 && t <= 5999:
 		return Debit, nil
 	default:
-		return 0, fmt.Errorf("%w: %d", ErrAccountTypeInvalid, t)
+		return 0, fmt.Errorf("%w: %d", domain_errors.ErrAccountTypeInvalid, t)
 	}
 }

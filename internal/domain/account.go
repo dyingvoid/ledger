@@ -1,19 +1,12 @@
 package domain
 
 import (
-	"errors"
 	"strings"
 	"time"
+
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
-var (
-	ErrAccountIDRequired   = errors.New("account ID is required")
-	ErrAccountNameRequired = errors.New("account name is required")
-	ErrAccountUserRequired = errors.New("account user ID is required")
-)
-
-// Account is the Postgres-side metadata for an account. Balances and movements
-// live in TigerBeetle and are never stored here.
 type Account struct {
 	ID          ID          `json:"id"`
 	UserID      int64       `json:"user_id"`
@@ -53,19 +46,19 @@ func (a Account) NormalBalance() (BalanceSide, error) {
 
 func (a Account) Validate() error {
 	if a.ID.IsZero() {
-		return ErrAccountIDRequired
+		return domain_errors.ErrAccountIDRequired
 	}
 	if a.UserID <= 0 {
-		return ErrAccountUserRequired
+		return domain_errors.ErrAccountUserRequired
 	}
 	if strings.TrimSpace(a.Name) == "" {
-		return ErrAccountNameRequired
+		return domain_errors.ErrAccountNameRequired
 	}
 	if err := a.Type.Validate(); err != nil {
 		return err
 	}
 	if strings.TrimSpace(string(a.Currency)) == "" {
-		return ErrAccountCurrencyRequired
+		return domain_errors.ErrAccountCurrencyRequired
 	}
 	return nil
 }

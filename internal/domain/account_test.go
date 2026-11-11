@@ -3,6 +3,8 @@ package domain
 import (
 	"errors"
 	"testing"
+
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 func TestParseID(t *testing.T) {
@@ -64,8 +66,8 @@ func TestParseID(t *testing.T) {
 		}
 
 		for _, value := range tests {
-			if _, err := ParseID(value); !errors.Is(err, ErrIDInvalid) {
-				t.Fatalf("ParseID(%q) error = %v, want %v", value, err, ErrIDInvalid)
+			if _, err := ParseID(value); !errors.Is(err, domain_errors.ErrIDInvalid) {
+				t.Fatalf("ParseID(%q) error = %v, want %v", value, err, domain_errors.ErrIDInvalid)
 			}
 		}
 	})
@@ -102,8 +104,8 @@ func TestAccountTypeNormalBalance(t *testing.T) {
 	}
 
 	for _, accountType := range []AccountType{999, 6000} {
-		if _, err := accountType.NormalBalance(); !errors.Is(err, ErrAccountTypeInvalid) {
-			t.Fatalf("NormalBalance() error = %v, want %v", err, ErrAccountTypeInvalid)
+		if _, err := accountType.NormalBalance(); !errors.Is(err, domain_errors.ErrAccountTypeInvalid) {
+			t.Fatalf("NormalBalance() error = %v, want %v", err, domain_errors.ErrAccountTypeInvalid)
 		}
 	}
 }
@@ -150,8 +152,8 @@ func TestNewAccount(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewAccount(ID{}, 7, "Daily", "", 2100, "USD")
-		if !errors.Is(err, ErrAccountIDRequired) {
-			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountIDRequired)
+		if !errors.Is(err, domain_errors.ErrAccountIDRequired) {
+			t.Fatalf("NewAccount() error = %v, want %v", err, domain_errors.ErrAccountIDRequired)
 		}
 	})
 
@@ -159,8 +161,8 @@ func TestNewAccount(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewAccount(testID(t, "1"), 0, "Daily", "", 2100, "USD")
-		if !errors.Is(err, ErrAccountUserRequired) {
-			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountUserRequired)
+		if !errors.Is(err, domain_errors.ErrAccountUserRequired) {
+			t.Fatalf("NewAccount() error = %v, want %v", err, domain_errors.ErrAccountUserRequired)
 		}
 	})
 
@@ -169,8 +171,8 @@ func TestNewAccount(t *testing.T) {
 
 		for _, accountType := range []AccountType{999, 6000} {
 			_, err := NewAccount(testID(t, "1"), 7, "Daily", "", accountType, "USD")
-			if !errors.Is(err, ErrAccountTypeInvalid) {
-				t.Fatalf("NewAccount(%d) error = %v, want %v", accountType, err, ErrAccountTypeInvalid)
+			if !errors.Is(err, domain_errors.ErrAccountTypeInvalid) {
+				t.Fatalf("NewAccount(%d) error = %v, want %v", accountType, err, domain_errors.ErrAccountTypeInvalid)
 			}
 		}
 	})
@@ -179,8 +181,8 @@ func TestNewAccount(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewAccount(testID(t, "1"), 7, "Daily", "", 2100, "  ")
-		if !errors.Is(err, ErrAccountCurrencyRequired) {
-			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountCurrencyRequired)
+		if !errors.Is(err, domain_errors.ErrAccountCurrencyRequired) {
+			t.Fatalf("NewAccount() error = %v, want %v", err, domain_errors.ErrAccountCurrencyRequired)
 		}
 	})
 
@@ -188,8 +190,8 @@ func TestNewAccount(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewAccount(testID(t, "1"), 7, "  ", "", 2100, "USD")
-		if !errors.Is(err, ErrAccountNameRequired) {
-			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountNameRequired)
+		if !errors.Is(err, domain_errors.ErrAccountNameRequired) {
+			t.Fatalf("NewAccount() error = %v, want %v", err, domain_errors.ErrAccountNameRequired)
 		}
 	})
 }

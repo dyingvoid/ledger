@@ -12,6 +12,7 @@ import (
 
 	"github.com/dyingvoid/ledger/internal/core/deposits"
 	"github.com/dyingvoid/ledger/internal/domain"
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 const depositTransferCode uint16 = 1
@@ -73,7 +74,7 @@ func (r *Deposits) clientAccountID(
 	if len(accountsFound) == 0 {
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: %s",
-			domain.ErrDepositAccountNotFound,
+			domain_errors.ErrDepositAccountNotFound,
 			deposit.AccountID,
 		)
 	}
@@ -82,14 +83,14 @@ func (r *Deposits) clientAccountID(
 	if account.Code != uint16(domain.AccountTypeClientDeposit) {
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: %s",
-			domain.ErrDepositAccountNotClient,
+			domain_errors.ErrDepositAccountNotClient,
 			deposit.AccountID,
 		)
 	}
 	if account.Ledger != ledger {
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: account ledger %d, deposit ledger %d",
-			domain.ErrDepositCurrencyMismatch,
+			domain_errors.ErrDepositCurrencyMismatch,
 			account.Ledger,
 			ledger,
 		)
@@ -143,12 +144,12 @@ func (r *Deposits) submitTransfer(
 	case tigerbeetle_go.TransferDebitAccountNotFound, tigerbeetle_go.TransferCreditAccountNotFound:
 		return domain.Deposit{}, fmt.Errorf(
 			"%w: %s",
-			domain.ErrDepositAccountNotFound,
+			domain_errors.ErrDepositAccountNotFound,
 			deposit.AccountID,
 		)
 	case tigerbeetle_go.TransferAccountsMustHaveTheSameLedger,
 		tigerbeetle_go.TransferTransferMustHaveTheSameLedgerAsAccounts:
-		return domain.Deposit{}, fmt.Errorf("%w: %s", domain.ErrDepositCurrencyMismatch, results[0].Status)
+		return domain.Deposit{}, fmt.Errorf("%w: %s", domain_errors.ErrDepositCurrencyMismatch, results[0].Status)
 	case tigerbeetle_go.TransferExistsWithDifferentFlags,
 		tigerbeetle_go.TransferExistsWithDifferentPendingID,
 		tigerbeetle_go.TransferExistsWithDifferentTimeout,
@@ -160,7 +161,7 @@ func (r *Deposits) submitTransfer(
 		tigerbeetle_go.TransferExistsWithDifferentUserData32,
 		tigerbeetle_go.TransferExistsWithDifferentLedger,
 		tigerbeetle_go.TransferExistsWithDifferentCode:
-		return domain.Deposit{}, fmt.Errorf("%w: %s", domain.ErrDepositConflict, results[0].Status)
+		return domain.Deposit{}, fmt.Errorf("%w: %s", domain_errors.ErrDepositConflict, results[0].Status)
 	default:
 		return domain.Deposit{}, fmt.Errorf(
 			"%w: creating transfer %s: %s",
@@ -227,7 +228,7 @@ func (r *Deposits) ensureBankCashAccount(ledger uint32) (tigerbeetle_go.Uint128,
 		tigerbeetle_go.AccountExistsWithDifferentCode:
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: bank cash account for ledger %d: %s",
-			domain.ErrDepositConflict,
+			domain_errors.ErrDepositConflict,
 			ledger,
 			results[0].Status,
 		)
@@ -247,10 +248,10 @@ func (r *Deposits) verifyExistingTransfer(expected tigerbeetle_go.Transfer) erro
 		return fmt.Errorf("%w: %w", deposits.ErrLedgerUnavailable, err)
 	}
 	if len(existing) != 1 {
-		return fmt.Errorf("%w: existing transfer %s not found", domain.ErrDepositConflict, expected.ID)
+		return fmt.Errorf("%w: existing transfer %s not found", domain_errors.ErrDepositConflict, expected.ID)
 	}
 	if !sameTransfer(existing[0], expected) {
-		return fmt.Errorf("%w: transfer %s", domain.ErrDepositConflict, expected.ID)
+		return fmt.Errorf("%w: transfer %s", domain_errors.ErrDepositConflict, expected.ID)
 	}
 	return nil
 }

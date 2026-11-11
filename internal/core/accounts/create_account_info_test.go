@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dyingvoid/ledger/internal/domain"
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 const (
@@ -118,8 +119,8 @@ func TestCreateAccountInfo(t *testing.T) {
 			Type:     2100,
 			Currency: testAccountCurrency,
 		})
-		if !errors.Is(err, domain.ErrAccountUserRequired) {
-			t.Fatalf("CreateAccountInfo() error = %v, want %v", err, domain.ErrAccountUserRequired)
+		if !errors.Is(err, domain_errors.ErrAccountUserRequired) {
+			t.Fatalf("CreateAccountInfo() error = %v, want %v", err, domain_errors.ErrAccountUserRequired)
 		}
 		if infos.createCalls != 0 {
 			t.Fatalf("Create() calls = %d, want 0", infos.createCalls)

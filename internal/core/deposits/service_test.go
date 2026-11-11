@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dyingvoid/ledger/internal/domain"
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 const testCurrency domain.Currency = "USD"
@@ -77,8 +78,8 @@ func TestDeposit(t *testing.T) {
 			AmountMinor: 0,
 			Currency:    testCurrency,
 		})
-		if !errors.Is(err, domain.ErrDepositAmountInvalid) {
-			t.Fatalf("Deposit() error = %v, want %v", err, domain.ErrDepositAmountInvalid)
+		if !errors.Is(err, domain_errors.ErrDepositAmountInvalid) {
+			t.Fatalf("Deposit() error = %v, want %v", err, domain_errors.ErrDepositAmountInvalid)
 		}
 		if repository.createCalls != 0 {
 			t.Fatalf("Create() calls = %d, want 0", repository.createCalls)

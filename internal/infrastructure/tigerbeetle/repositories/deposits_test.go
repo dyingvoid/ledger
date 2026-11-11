@@ -9,6 +9,7 @@ import (
 	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
 
 	"github.com/dyingvoid/ledger/internal/domain"
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 func testID(t *testing.T, value string) domain.ID {
@@ -112,8 +113,8 @@ func TestCreateDepositRejectsUnknownAccount(t *testing.T) {
 	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
 
 	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
-	if !errors.Is(err, domain.ErrDepositAccountNotFound) {
-		t.Fatalf("Create() error = %v, want %v", err, domain.ErrDepositAccountNotFound)
+	if !errors.Is(err, domain_errors.ErrDepositAccountNotFound) {
+		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrDepositAccountNotFound)
 	}
 	if client.calls != 0 {
 		t.Fatalf("CreateAccounts() calls = %d, want 0", client.calls)
@@ -132,8 +133,8 @@ func TestCreateDepositRejectsNonClientAccount(t *testing.T) {
 	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
 
 	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
-	if !errors.Is(err, domain.ErrDepositAccountNotClient) {
-		t.Fatalf("Create() error = %v, want %v", err, domain.ErrDepositAccountNotClient)
+	if !errors.Is(err, domain_errors.ErrDepositAccountNotClient) {
+		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrDepositAccountNotClient)
 	}
 }
 
@@ -149,8 +150,8 @@ func TestCreateDepositRejectsCurrencyMismatch(t *testing.T) {
 	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
 
 	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
-	if !errors.Is(err, domain.ErrDepositCurrencyMismatch) {
-		t.Fatalf("Create() error = %v, want %v", err, domain.ErrDepositCurrencyMismatch)
+	if !errors.Is(err, domain_errors.ErrDepositCurrencyMismatch) {
+		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrDepositCurrencyMismatch)
 	}
 }
 
@@ -201,8 +202,8 @@ func TestCreateDepositRejectsConflictingExistingTransfer(t *testing.T) {
 	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
 
 	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
-	if !errors.Is(err, domain.ErrDepositConflict) {
-		t.Fatalf("Create() error = %v, want %v", err, domain.ErrDepositConflict)
+	if !errors.Is(err, domain_errors.ErrDepositConflict) {
+		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrDepositConflict)
 	}
 }
 
@@ -240,10 +241,10 @@ func TestCreateDepositCurrencyNotFound(t *testing.T) {
 	t.Parallel()
 
 	client := &fakeClient{}
-	repository := NewDeposits(client, &fakeCurrencies{err: domain.ErrAccountCurrencyRequired})
+	repository := NewDeposits(client, &fakeCurrencies{err: domain_errors.ErrAccountCurrencyRequired})
 
 	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
-	if !errors.Is(err, domain.ErrAccountCurrencyRequired) {
-		t.Fatalf("Create() error = %v, want %v", err, domain.ErrAccountCurrencyRequired)
+	if !errors.Is(err, domain_errors.ErrAccountCurrencyRequired) {
+		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrAccountCurrencyRequired)
 	}
 }

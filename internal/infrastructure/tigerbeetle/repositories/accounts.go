@@ -8,6 +8,7 @@ import (
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
 	"github.com/dyingvoid/ledger/internal/domain"
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 type CurrencyLedgerRepository interface {
@@ -25,7 +26,7 @@ func NewAccounts(client tigerbeetle_go.Client, currencies CurrencyLedgerReposito
 
 func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.Account, error) {
 	if account.ID.IsZero() {
-		return domain.Account{}, domain.ErrAccountIDRequired
+		return domain.Account{}, domain_errors.ErrAccountIDRequired
 	}
 
 	info, err := r.currencies.Get(ctx, account.Currency)

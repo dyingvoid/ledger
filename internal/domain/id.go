@@ -1,13 +1,12 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
-)
 
-var ErrIDInvalid = errors.New("ID is invalid")
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
+)
 
 const idSize = 16
 
@@ -23,7 +22,7 @@ type ID [idSize]byte
 func ParseID(value string) (ID, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return ID{}, fmt.Errorf("%w: empty", ErrIDInvalid)
+		return ID{}, fmt.Errorf("%w: empty", domain_errors.ErrIDInvalid)
 	}
 
 	base := 10
@@ -34,16 +33,16 @@ func ParseID(value string) (ID, error) {
 
 	number, ok := new(big.Int).SetString(value, base)
 	if !ok {
-		return ID{}, fmt.Errorf("%w: %q", ErrIDInvalid, value)
+		return ID{}, fmt.Errorf("%w: %q", domain_errors.ErrIDInvalid, value)
 	}
 	if number.Sign() <= 0 {
-		return ID{}, fmt.Errorf("%w: must be positive", ErrIDInvalid)
+		return ID{}, fmt.Errorf("%w: must be positive", domain_errors.ErrIDInvalid)
 	}
 	if number.BitLen() > 128 {
-		return ID{}, fmt.Errorf("%w: exceeds 128 bits", ErrIDInvalid)
+		return ID{}, fmt.Errorf("%w: exceeds 128 bits", domain_errors.ErrIDInvalid)
 	}
 	if number.Cmp(maxID) == 0 {
-		return ID{}, fmt.Errorf("%w: must not be the maximum value", ErrIDInvalid)
+		return ID{}, fmt.Errorf("%w: must not be the maximum value", domain_errors.ErrIDInvalid)
 	}
 
 	return idFromBigEndian(number.FillBytes(make([]byte, idSize))), nil

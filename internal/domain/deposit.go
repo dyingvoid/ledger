@@ -1,19 +1,9 @@
 package domain
 
 import (
-	"errors"
 	"strings"
-)
 
-var (
-	ErrDepositIDRequired       = errors.New("deposit ID is required")
-	ErrDepositAccountRequired  = errors.New("deposit account ID is required")
-	ErrDepositAmountInvalid    = errors.New("deposit amount must be positive")
-	ErrDepositCurrencyRequired = errors.New("deposit currency is required")
-	ErrDepositAccountNotFound  = errors.New("deposit account not found")
-	ErrDepositAccountNotClient = errors.New("account is not a client deposit account")
-	ErrDepositCurrencyMismatch = errors.New("deposit currency does not match account currency")
-	ErrDepositConflict         = errors.New("deposit conflicts with an existing transfer")
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 // Deposit is a request to move funds into a client account. Its ID is the
@@ -40,16 +30,16 @@ func NewDeposit(id ID, accountID ID, amountMinor int64, currency Currency) (Depo
 
 func (d Deposit) Validate() error {
 	if d.ID.IsZero() {
-		return ErrDepositIDRequired
+		return domain_errors.ErrDepositIDRequired
 	}
 	if d.AccountID.IsZero() {
-		return ErrDepositAccountRequired
+		return domain_errors.ErrDepositAccountRequired
 	}
 	if d.AmountMinor <= 0 {
-		return ErrDepositAmountInvalid
+		return domain_errors.ErrDepositAmountInvalid
 	}
 	if strings.TrimSpace(string(d.Currency)) == "" {
-		return ErrDepositCurrencyRequired
+		return domain_errors.ErrDepositCurrencyRequired
 	}
 	return nil
 }

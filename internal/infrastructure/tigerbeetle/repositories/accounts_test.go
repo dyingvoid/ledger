@@ -9,6 +9,7 @@ import (
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
 	"github.com/dyingvoid/ledger/internal/domain"
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 const testUSD domain.Currency = "USD"
@@ -259,8 +260,8 @@ func TestCreateAccountRequiresID(t *testing.T) {
 	account.ID = domain.ID{}
 
 	_, err := repository.Create(context.Background(), account)
-	if !errors.Is(err, domain.ErrAccountIDRequired) {
-		t.Fatalf("Create() error = %v, want %v", err, domain.ErrAccountIDRequired)
+	if !errors.Is(err, domain_errors.ErrAccountIDRequired) {
+		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrAccountIDRequired)
 	}
 	if client.calls != 0 {
 		t.Fatalf("CreateAccounts() calls = %d, want 0", client.calls)
