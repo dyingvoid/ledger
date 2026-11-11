@@ -20,7 +20,7 @@ func NewCurrencyInfos(pool *pgxpool.Pool) *CurrencyInfos {
 	return &CurrencyInfos{pool: pool}
 }
 
-func (r *CurrencyInfos) Get(ctx context.Context, currency domain.Currency) (domain.CurrencyInfo, error) {
+func (r *CurrencyInfos) Get(ctx context.Context, currency string) (domain.CurrencyInfo, error) {
 	var (
 		info       domain.CurrencyInfo
 		ledger     uint32
@@ -32,7 +32,7 @@ func (r *CurrencyInfos) Get(ctx context.Context, currency domain.Currency) (doma
 		`SELECT name, ledger, asset_scale
 		 FROM ledger.currency_info
 		 WHERE code = $1`,
-		string(currency),
+		currency,
 	).Scan(
 		&info.Name,
 		&ledger,
@@ -51,12 +51,12 @@ func (r *CurrencyInfos) Get(ctx context.Context, currency domain.Currency) (doma
 	return info, nil
 }
 
-func (r *CurrencyInfos) Exists(ctx context.Context, currency domain.Currency) (bool, error) {
+func (r *CurrencyInfos) Exists(ctx context.Context, currency string) (bool, error) {
 	var exists bool
 	err := r.pool.QueryRow(
 		ctx,
 		`SELECT EXISTS (SELECT 1 FROM ledger.currency_info WHERE code = $1)`,
-		string(currency),
+		currency,
 	).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("checking currency: %w", err)

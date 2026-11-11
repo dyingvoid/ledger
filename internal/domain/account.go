@@ -13,7 +13,7 @@ type Account struct {
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	Type        AccountType `json:"type"`
-	Currency    Currency    `json:"currency"`
+	Currency    string      `json:"currency"`
 	DeletedAt   *time.Time  `json:"deleted_at,omitempty"`
 	CreatedAt   time.Time   `json:"created_at"`
 }
@@ -24,7 +24,7 @@ func NewAccount(
 	name string,
 	description string,
 	accountType AccountType,
-	currency Currency,
+	currency string,
 ) (Account, error) {
 	account := Account{
 		ID:          id,
@@ -57,7 +57,7 @@ func (a Account) Validate() error {
 	if err := a.Type.Validate(); err != nil {
 		return err
 	}
-	if strings.TrimSpace(string(a.Currency)) == "" {
+	if strings.TrimSpace(a.Currency) == "" {
 		return domain_errors.ErrAccountCurrencyRequired
 	}
 	return nil

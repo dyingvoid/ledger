@@ -12,7 +12,7 @@ import (
 	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
-const testUSD domain.Currency = "USD"
+const testUSD = "USD"
 
 type fakeClient struct {
 	results  []tigerbeetle_go.CreateAccountResult
@@ -93,7 +93,7 @@ type fakeCurrencies struct {
 	err  error
 }
 
-func (f *fakeCurrencies) Get(_ context.Context, _ domain.Currency) (domain.CurrencyInfo, error) {
+func (f *fakeCurrencies) Get(_ context.Context, _ string) (domain.CurrencyInfo, error) {
 	if f.err != nil {
 		return domain.CurrencyInfo{}, f.err
 	}

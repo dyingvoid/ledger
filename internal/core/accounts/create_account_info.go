@@ -23,7 +23,7 @@ type CreateAccountInfoParams struct {
 	Name        string
 	Description string
 	Type        domain.AccountType
-	Currency    domain.Currency
+	Currency    string
 }
 
 func (s *Service) CreateAccountInfo(

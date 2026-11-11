@@ -1,10 +1,7 @@
 package domain
 
-type Currency string
-
-// CurrencyInfo maps a currency to its TigerBeetle ledger and asset scale.
 type CurrencyInfo struct {
-	Code       Currency
+	Code       string
 	Name       string
 	Ledger     uint32
 	AssetScale int16

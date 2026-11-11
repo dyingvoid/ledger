@@ -40,7 +40,7 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 		account.Name,
 		account.Description,
 		int32(account.Type),
-		string(account.Currency),
+		account.Currency,
 	))
 	if err == nil {
 		return created, nil
@@ -112,7 +112,7 @@ func scanAccount(row rowScanner) (domain.Account, error) {
 
 	account.ID = domain.IDFromBytes([16]byte(stored))
 	account.Type = domain.AccountType(typ)
-	account.Currency = domain.Currency(currency)
+	account.Currency = currency
 	return account, nil
 }
 

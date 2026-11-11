@@ -34,7 +34,7 @@ func (s *accountService) CreateAccountInfo(
 		Name:        req.GetName(),
 		Description: req.GetDescription(),
 		Type:        domain.AccountType(req.GetType()),
-		Currency:    domain.Currency(req.GetCurrency()),
+		Currency:    req.GetCurrency(),
 	})
 	if err != nil {
 		return nil, toStatus(err)
@@ -71,7 +71,7 @@ func toProtoAccount(account domain.Account) *accountsv1.AccountInfo {
 		Name:        account.Name,
 		Description: account.Description,
 		Type:        int32(account.Type),
-		Currency:    string(account.Currency),
+		Currency:    account.Currency,
 	}
 	if !account.CreatedAt.IsZero() {
 		response.CreatedAt = timestamppb.New(account.CreatedAt)

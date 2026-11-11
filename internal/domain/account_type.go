@@ -16,12 +16,8 @@ const (
 
 type AccountType int32
 
-func (t AccountType) Valid() bool {
-	return t >= minAccountType && t <= maxAccountType
-}
-
 func (t AccountType) Validate() error {
-	if !t.Valid() {
+	if t < minAccountType || t > maxAccountType {
 		return fmt.Errorf("%w: %d", domain_errors.ErrAccountTypeInvalid, t)
 	}
 	return nil

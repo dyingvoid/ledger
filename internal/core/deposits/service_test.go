@@ -9,7 +9,7 @@ import (
 	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
-const testCurrency domain.Currency = "USD"
+const testCurrency = "USD"
 
 type fakeDepositRepository struct {
 	createErr   error

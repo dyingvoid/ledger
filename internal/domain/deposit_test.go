@@ -7,7 +7,7 @@ import (
 	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
-const testDepositCurrency Currency = "USD"
+const testDepositCurrency = "USD"
 
 func TestNewDeposit(t *testing.T) {
 	t.Parallel()
@@ -38,7 +38,7 @@ func TestNewDeposit(t *testing.T) {
 		id        ID
 		accountID ID
 		amount    int64
-		currency  Currency
+		currency  string
 		want      error
 	}{
 		{

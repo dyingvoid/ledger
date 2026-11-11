@@ -54,7 +54,7 @@ func (r *Deposits) Create(ctx context.Context, deposit domain.Deposit) (domain.D
 	))
 }
 
-func (r *Deposits) currencyInfo(ctx context.Context, currency domain.Currency) (domain.CurrencyInfo, error) {
+func (r *Deposits) currencyInfo(ctx context.Context, currency string) (domain.CurrencyInfo, error) {
 	info, err := r.currencies.Get(ctx, currency)
 	if err != nil {
 		return domain.CurrencyInfo{}, fmt.Errorf("getting currency ledger: %w", err)

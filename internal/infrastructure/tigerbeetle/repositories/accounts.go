@@ -12,7 +12,7 @@ import (
 )
 
 type CurrencyLedgerRepository interface {
-	Get(ctx context.Context, currency domain.Currency) (domain.CurrencyInfo, error)
+	Get(ctx context.Context, currency string) (domain.CurrencyInfo, error)
 }
 
 type Accounts struct {

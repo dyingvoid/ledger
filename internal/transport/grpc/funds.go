@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/dyingvoid/ledger/internal/core/deposits"
-	"github.com/dyingvoid/ledger/internal/domain"
 	fundsv1 "github.com/dyingvoid/ledger/pkg/proto/ledger/funds/v1"
 )
 
@@ -35,7 +34,7 @@ func (s *fundsService) Deposit(
 		ID:          id,
 		AccountID:   accountID,
 		AmountMinor: req.GetAmountMinor(),
-		Currency:    domain.Currency(req.GetCurrency()),
+		Currency:    req.GetCurrency(),
 	})
 	if err != nil {
 		return nil, toStatus(err)

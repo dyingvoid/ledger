@@ -29,11 +29,9 @@ type DepositParams struct {
 	ID          domain.ID
 	AccountID   domain.ID
 	AmountMinor int64
-	Currency    domain.Currency
+	Currency    string
 }
 
-// Deposit moves funds into a client account. The deposit ID is the
-// TigerBeetle transfer ID and therefore its idempotency key.
 func (s *Service) Deposit(ctx context.Context, params DepositParams) (domain.Deposit, error) {
 	deposit, err := domain.NewDeposit(
 		params.ID,

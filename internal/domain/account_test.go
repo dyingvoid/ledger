@@ -120,22 +120,26 @@ func TestAccountTypeNormalBalance(t *testing.T) {
 	}
 }
 
-func TestAccountTypeValid(t *testing.T) {
+func TestAccountTypeValidate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		accountType AccountType
-		want        bool
+		wantErr     bool
 	}{
-		{accountType: 999, want: false},
-		{accountType: 1000, want: true},
-		{accountType: 5999, want: true},
-		{accountType: 6000, want: false},
+		{accountType: 999, wantErr: true},
+		{accountType: 1000, wantErr: false},
+		{accountType: 5999, wantErr: false},
+		{accountType: 6000, wantErr: true},
 	}
 
 	for _, test := range tests {
-		if got := test.accountType.Valid(); got != test.want {
-			t.Fatalf("Valid() for %d = %t, want %t", test.accountType, got, test.want)
+		err := test.accountType.Validate()
+		if test.wantErr && !errors.Is(err, domain_errors.ErrAccountTypeInvalid) {
+			t.Fatalf("Validate() for %d error = %v, want %v", test.accountType, err, domain_errors.ErrAccountTypeInvalid)
+		}
+		if !test.wantErr && err != nil {
+			t.Fatalf("Validate() for %d error = %v, want nil", test.accountType, err)
 		}
 	}
 }

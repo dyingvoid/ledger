@@ -6,16 +6,14 @@ import (
 	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
-// Deposit is a request to move funds into a client account. Its ID is the
-// TigerBeetle transfer ID and therefore also its idempotency key.
 type Deposit struct {
-	ID          ID       `json:"id"`
-	AccountID   ID       `json:"account_id"`
-	AmountMinor int64    `json:"amount_minor"`
-	Currency    Currency `json:"currency"`
+	ID          ID     `json:"id"`
+	AccountID   ID     `json:"account_id"`
+	AmountMinor int64  `json:"amount_minor"`
+	Currency    string `json:"currency"`
 }
 
-func NewDeposit(id ID, accountID ID, amountMinor int64, currency Currency) (Deposit, error) {
+func NewDeposit(id ID, accountID ID, amountMinor int64, currency string) (Deposit, error) {
 	deposit := Deposit{
 		ID:          id,
 		AccountID:   accountID,
@@ -38,7 +36,7 @@ func (d Deposit) Validate() error {
 	if d.AmountMinor <= 0 {
 		return domain_errors.ErrDepositAmountInvalid
 	}
-	if strings.TrimSpace(string(d.Currency)) == "" {
+	if strings.TrimSpace(d.Currency) == "" {
 		return domain_errors.ErrDepositCurrencyRequired
 	}
 	return nil
