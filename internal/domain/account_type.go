@@ -50,6 +50,14 @@ func (t AccountType) Category() (AccountCategory, error) {
 	}
 }
 
+func (t AccountType) SupportsDeposits() bool {
+	return t == AccountTypeClientDeposit
+}
+
+func (t AccountType) CanFundDeposits() bool {
+	return t == AccountTypeBankCash
+}
+
 func (t AccountType) NormalBalance() (BalanceSide, error) {
 	category, err := t.Category()
 	if err != nil {

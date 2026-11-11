@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package ledger.currencies.v1;
+
+option go_package = "github.com/dyingvoid/ledger/pkg/proto/ledger/currencies/v1;currenciesv1";
+
+service CurrencyService {
+  rpc CreateCurrency(CreateCurrencyRequest) returns (CreateCurrencyResponse);
+}
+
+message CreateCurrencyRequest {
+  string code = 1;
+  string name = 2;
+  uint32 ledger = 3;
+  int32 asset_scale = 4;
+}
+
+message CreateCurrencyResponse {
+  CurrencyInfo currency = 1;
+}
+
+message CurrencyInfo {
+  string code = 1;
+  string name = 2;
+  uint32 ledger = 3;
+  int32 asset_scale = 4;
+}

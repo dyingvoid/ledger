@@ -6,7 +6,7 @@ MIGRATE_LOCK_TIMEOUT ?= 5
 RATE ?= 6
 DURATION ?= 1m
 
-.PHONY: run build test fmt vet lint lint-fix tidy \
+.PHONY: run build test fmt vet lint lint-fix tidy seed \
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
 	tigerbeetle-up tigerbeetle-down tigerbeetle-logs \
@@ -19,6 +19,9 @@ run:
 
 build:
 	@go build -o bin/$(APP) ./cmd/$(APP)
+
+seed:
+	@go run ./cmd/seed -addr localhost:$(or $(GRPC_PORT),50051)
 
 test:
 	@go test -race ./...

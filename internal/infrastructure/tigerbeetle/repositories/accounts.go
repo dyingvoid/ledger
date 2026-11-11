@@ -24,11 +24,13 @@ func NewAccounts(client tigerbeetle_go.Client, currencies CurrencyLedgerReposito
 	return &Accounts{client: client, currencies: currencies}
 }
 
+// TODO: in another service limit who can create what types of account(authorization, doesn't concern this service)
 func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.Account, error) {
 	if account.ID.IsZero() {
 		return domain.Account{}, domain_errors.ErrAccountIDRequired
 	}
 
+	// TODO: perhaps domain.Account should contain currency info itself already
 	info, err := r.currencies.Get(ctx, account.Currency)
 	if err != nil {
 		return domain.Account{}, fmt.Errorf("getting currency ledger: %w", err)
@@ -41,7 +43,7 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 
 	results, err := r.client.CreateAccounts([]tigerbeetle_go.Account{{
 		ID:         toTigerbeetleID(account.ID),
-		UserData64: uint64(account.UserID), //nolint:gosec // UserID is validated as positive before reaching the repository.
+		UserData64: uint64(account.UserID),
 		Ledger:     info.Ledger,
 		Code:       uint16(account.Type), //nolint:gosec // Account types are validated to be between 1000 and 5999.
 		Flags:      flags,

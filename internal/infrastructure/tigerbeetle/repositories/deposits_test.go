@@ -3,11 +3,11 @@ package repositories
 import (
 	"context"
 	"errors"
-	"strconv"
 	"testing"
 
 	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
 
+	"github.com/dyingvoid/ledger/internal/core/deposits"
 	"github.com/dyingvoid/ledger/internal/domain"
 	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
@@ -22,14 +22,32 @@ func testID(t *testing.T, value string) domain.ID {
 	return id
 }
 
-func testDeposit(t *testing.T, accountID string, transferID string) domain.Deposit {
+func testDeposit(t *testing.T, clientAccountID string, bankAccountID string, transferID string) domain.Deposit {
 	t.Helper()
 
 	deposit, err := domain.NewDeposit(
 		testID(t, transferID),
-		testID(t, accountID),
 		2500,
-		testUSD,
+		domain.CurrencyInfo{
+			Code:       testUSD,
+			Name:       "US Dollar",
+			Ledger:     1,
+			AssetScale: 2,
+		},
+		domain.Account{
+			ID:       testID(t, clientAccountID),
+			UserID:   7,
+			Name:     "Client",
+			Type:     domain.AccountTypeClientDeposit,
+			Currency: testUSD,
+		},
+		domain.Account{
+			ID:       testID(t, bankAccountID),
+			UserID:   1,
+			Name:     "Bank Cash",
+			Type:     domain.AccountTypeBankCash,
+			Currency: testUSD,
+		},
 	)
 	if err != nil {
 		t.Fatalf("NewDeposit() error = %v", err)
@@ -37,36 +55,14 @@ func testDeposit(t *testing.T, accountID string, transferID string) domain.Depos
 	return deposit
 }
 
-func testDepositRepository(client *fakeClient, info domain.CurrencyInfo) *Deposits {
-	return NewDeposits(client, &fakeCurrencies{info: info})
-}
-
-func testBankCashID(t *testing.T, ledger uint32) tigerbeetle_go.Uint128 {
-	t.Helper()
-
-	id, err := deterministicID(
-		"ledger.bank-cash.v1",
-		strconv.FormatUint(uint64(ledger), 10),
-	)
-	if err != nil {
-		t.Fatalf("deterministicID() error = %v", err)
-	}
-	return toTigerbeetleID(id)
-}
-
 func TestCreateDepositMapsTransfer(t *testing.T) {
 	t.Parallel()
 
 	client := &fakeClient{
-		results: []tigerbeetle_go.CreateAccountResult{{Status: tigerbeetle_go.AccountCreated}},
-		lookupAccounts: []tigerbeetle_go.Account{{
-			Ledger: 1,
-			Code:   uint16(domain.AccountTypeClientDeposit),
-		}},
 		transferResults: []tigerbeetle_go.CreateTransferResult{{Status: tigerbeetle_go.TransferCreated}},
 	}
-	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
-	deposit := testDeposit(t, "42", "99")
+	repository := NewDeposits(client)
+	deposit := testDeposit(t, "42", "43", "99")
 
 	created, err := repository.Create(context.Background(), deposit)
 	if err != nil {
@@ -78,8 +74,8 @@ func TestCreateDepositMapsTransfer(t *testing.T) {
 	if client.transferCalls != 1 {
 		t.Fatalf("CreateTransfers() calls = %d, want 1", client.transferCalls)
 	}
-	if client.calls != 1 {
-		t.Fatalf("CreateAccounts() calls = %d, want 1", client.calls)
+	if client.calls != 0 {
+		t.Fatalf("CreateAccounts() calls = %d, want 0", client.calls)
 	}
 	if len(client.transfers) != 1 {
 		t.Fatalf("transfers = %d, want 1", len(client.transfers))
@@ -89,11 +85,11 @@ func TestCreateDepositMapsTransfer(t *testing.T) {
 	if transfer.ID != toTigerbeetleID(deposit.ID) {
 		t.Fatalf("transfer ID = %s, want %s", transfer.ID, deposit.ID)
 	}
-	if transfer.DebitAccountID != testBankCashID(t, 1) {
-		t.Fatalf("debit account = %s, want bank cash account", transfer.DebitAccountID)
+	if transfer.DebitAccountID != toTigerbeetleID(deposit.BankAccount.ID) {
+		t.Fatalf("debit account = %s, want %s", transfer.DebitAccountID, deposit.BankAccount.ID)
 	}
-	if transfer.CreditAccountID != toTigerbeetleID(deposit.AccountID) {
-		t.Fatalf("credit account = %s, want %s", transfer.CreditAccountID, deposit.AccountID)
+	if transfer.CreditAccountID != toTigerbeetleID(deposit.ClientAccount.ID) {
+		t.Fatalf("credit account = %s, want %s", transfer.CreditAccountID, deposit.ClientAccount.ID)
 	}
 	if transfer.Amount != tigerbeetle_go.ToUint128(2500) {
 		t.Fatalf("amount = %s, want 2500", transfer.Amount)
@@ -106,79 +102,73 @@ func TestCreateDepositMapsTransfer(t *testing.T) {
 	}
 }
 
-func TestCreateDepositRejectsUnknownAccount(t *testing.T) {
+func TestCreateDepositMapsStatuses(t *testing.T) {
 	t.Parallel()
 
-	client := &fakeClient{}
-	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
-
-	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
-	if !errors.Is(err, domain_errors.ErrDepositAccountNotFound) {
-		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrDepositAccountNotFound)
+	tests := []struct {
+		name    string
+		status  tigerbeetle_go.CreateTransferStatus
+		wantErr error
+	}{
+		{
+			name:    "bank account missing in ledger",
+			status:  tigerbeetle_go.TransferDebitAccountNotFound,
+			wantErr: domain_errors.ErrDepositBankAccountNotFound,
+		},
+		{
+			name:    "client account missing in ledger",
+			status:  tigerbeetle_go.TransferCreditAccountNotFound,
+			wantErr: domain_errors.ErrDepositClientAccountNotFound,
+		},
+		{
+			name:    "accounts have different ledgers",
+			status:  tigerbeetle_go.TransferAccountsMustHaveTheSameLedger,
+			wantErr: domain_errors.ErrDepositCurrencyMismatch,
+		},
+		{
+			name:    "existing transfer with different amount",
+			status:  tigerbeetle_go.TransferExistsWithDifferentAmount,
+			wantErr: domain_errors.ErrDepositConflict,
+		},
 	}
-	if client.calls != 0 {
-		t.Fatalf("CreateAccounts() calls = %d, want 0", client.calls)
-	}
-}
 
-func TestCreateDepositRejectsNonClientAccount(t *testing.T) {
-	t.Parallel()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
-	client := &fakeClient{
-		lookupAccounts: []tigerbeetle_go.Account{{
-			Ledger: 1,
-			Code:   uint16(domain.AccountTypeBankCash),
-		}},
-	}
-	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
+			client := &fakeClient{
+				transferResults: []tigerbeetle_go.CreateTransferResult{{Status: test.status}},
+			}
+			repository := NewDeposits(client)
 
-	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
-	if !errors.Is(err, domain_errors.ErrDepositAccountNotClient) {
-		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrDepositAccountNotClient)
-	}
-}
-
-func TestCreateDepositRejectsCurrencyMismatch(t *testing.T) {
-	t.Parallel()
-
-	client := &fakeClient{
-		lookupAccounts: []tigerbeetle_go.Account{{
-			Ledger: 2,
-			Code:   uint16(domain.AccountTypeClientDeposit),
-		}},
-	}
-	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
-
-	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
-	if !errors.Is(err, domain_errors.ErrDepositCurrencyMismatch) {
-		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrDepositCurrencyMismatch)
+			_, err := repository.Create(context.Background(), testDeposit(t, "42", "43", "99"))
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("Create() error = %v, want %v", err, test.wantErr)
+			}
+		})
 	}
 }
 
 func TestCreateDepositTreatsExistingTransferAsSuccess(t *testing.T) {
 	t.Parallel()
 
+	deposit := testDeposit(t, "42", "43", "99")
 	expected := tigerbeetle_go.Transfer{
-		ID:              toTigerbeetleID(testID(t, "99")),
-		DebitAccountID:  testBankCashID(t, 1),
-		CreditAccountID: toTigerbeetleID(testID(t, "42")),
+		ID:              toTigerbeetleID(deposit.ID),
+		DebitAccountID:  toTigerbeetleID(deposit.BankAccount.ID),
+		CreditAccountID: toTigerbeetleID(deposit.ClientAccount.ID),
 		Amount:          tigerbeetle_go.ToUint128(2500),
-		UserData128:     toTigerbeetleID(testID(t, "42")),
+		UserData128:     toTigerbeetleID(deposit.ClientAccount.ID),
 		Ledger:          1,
 		Code:            depositTransferCode,
 	}
 	client := &fakeClient{
-		results: []tigerbeetle_go.CreateAccountResult{{Status: tigerbeetle_go.AccountExists}},
-		lookupAccounts: []tigerbeetle_go.Account{{
-			Ledger: 1,
-			Code:   uint16(domain.AccountTypeClientDeposit),
-		}},
 		transferResults: []tigerbeetle_go.CreateTransferResult{{Status: tigerbeetle_go.TransferExists}},
 		lookupTransfers: []tigerbeetle_go.Transfer{expected},
 	}
-	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
+	repository := NewDeposits(client)
 
-	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
+	_, err := repository.Create(context.Background(), deposit)
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
@@ -188,63 +178,29 @@ func TestCreateDepositRejectsConflictingExistingTransfer(t *testing.T) {
 	t.Parallel()
 
 	client := &fakeClient{
-		results: []tigerbeetle_go.CreateAccountResult{{Status: tigerbeetle_go.AccountExists}},
-		lookupAccounts: []tigerbeetle_go.Account{{
-			Ledger: 1,
-			Code:   uint16(domain.AccountTypeClientDeposit),
-		}},
 		transferResults: []tigerbeetle_go.CreateTransferResult{{Status: tigerbeetle_go.TransferExists}},
 		lookupTransfers: []tigerbeetle_go.Transfer{{
 			ID:     toTigerbeetleID(testID(t, "99")),
 			Amount: tigerbeetle_go.ToUint128(1),
 		}},
 	}
-	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
+	repository := NewDeposits(client)
 
-	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
+	_, err := repository.Create(context.Background(), testDeposit(t, "42", "43", "99"))
 	if !errors.Is(err, domain_errors.ErrDepositConflict) {
 		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrDepositConflict)
 	}
 }
 
-func TestCreateDepositEnsuresBankCashAccountOnce(t *testing.T) {
+func TestCreateDepositLedgerUnavailable(t *testing.T) {
 	t.Parallel()
 
-	client := &fakeClient{
-		results: []tigerbeetle_go.CreateAccountResult{{Status: tigerbeetle_go.AccountCreated}},
-		lookupAccounts: []tigerbeetle_go.Account{{
-			Ledger: 1,
-			Code:   uint16(domain.AccountTypeClientDeposit),
-		}},
-		transferResults: []tigerbeetle_go.CreateTransferResult{
-			{Status: tigerbeetle_go.TransferCreated},
-			{Status: tigerbeetle_go.TransferCreated},
-		},
-	}
-	repository := testDepositRepository(client, domain.CurrencyInfo{Code: testUSD, Ledger: 1})
+	clientErr := errors.New("connection lost")
+	client := &fakeClient{transferErr: clientErr}
+	repository := NewDeposits(client)
 
-	if _, err := repository.Create(context.Background(), testDeposit(t, "42", "99")); err != nil {
-		t.Fatalf("first Create() error = %v", err)
-	}
-	if _, err := repository.Create(context.Background(), testDeposit(t, "42", "100")); err != nil {
-		t.Fatalf("second Create() error = %v", err)
-	}
-	if client.calls != 1 {
-		t.Fatalf("CreateAccounts() calls = %d, want 1", client.calls)
-	}
-	if client.transferCalls != 2 {
-		t.Fatalf("CreateTransfers() calls = %d, want 2", client.transferCalls)
-	}
-}
-
-func TestCreateDepositCurrencyNotFound(t *testing.T) {
-	t.Parallel()
-
-	client := &fakeClient{}
-	repository := NewDeposits(client, &fakeCurrencies{err: domain_errors.ErrAccountCurrencyRequired})
-
-	_, err := repository.Create(context.Background(), testDeposit(t, "42", "99"))
-	if !errors.Is(err, domain_errors.ErrAccountCurrencyRequired) {
-		t.Fatalf("Create() error = %v, want %v", err, domain_errors.ErrAccountCurrencyRequired)
+	_, err := repository.Create(context.Background(), testDeposit(t, "42", "43", "99"))
+	if !errors.Is(err, deposits.ErrLedgerUnavailable) {
+		t.Fatalf("Create() error = %v, want %v", err, deposits.ErrLedgerUnavailable)
 	}
 }

@@ -60,6 +60,29 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 	return existing, nil
 }
 
+func (r *Accounts) GetBankCash(ctx context.Context, currency string) (domain.Account, error) {
+	account, err := scanAccount(r.pool.QueryRow(
+		ctx,
+		`SELECT id, user_id, name, description, account_type, currency, deleted_at, created_at
+		 FROM ledger.account_info
+		 WHERE account_type = $1
+		   AND currency = $2
+		   AND deleted_at IS NULL
+		 ORDER BY created_at, id
+		 LIMIT 1`,
+		int32(domain.AccountTypeBankCash),
+		currency,
+	))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Account{}, fmt.Errorf("%w: %q", accounts.ErrBankCashAccountNotFound, currency)
+	}
+	if err != nil {
+		return domain.Account{}, fmt.Errorf("getting bank cash account: %w", err)
+	}
+
+	return account, nil
+}
+
 func (r *Accounts) Get(ctx context.Context, id domain.ID) (domain.Account, error) {
 	stored := id.Bytes()
 

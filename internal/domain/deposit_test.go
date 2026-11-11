@@ -3,11 +3,49 @@ package domain
 import (
 	"errors"
 	"testing"
+	"time"
 
 	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 const testDepositCurrency = "USD"
+
+func testDepositCurrencyInfo() CurrencyInfo {
+	return CurrencyInfo{
+		Code:       testDepositCurrency,
+		Name:       "US Dollar",
+		Ledger:     1,
+		AssetScale: 2,
+	}
+}
+
+func testDepositAccount(t *testing.T, id string, accountType AccountType, currency string) Account {
+	t.Helper()
+
+	return Account{
+		ID:       testID(t, id),
+		UserID:   1,
+		Name:     "Account " + id,
+		Type:     accountType,
+		Currency: currency,
+	}
+}
+
+func testValidDeposit(t *testing.T) Deposit {
+	t.Helper()
+
+	deposit, err := NewDeposit(
+		testID(t, "9"),
+		2500,
+		testDepositCurrencyInfo(),
+		testDepositAccount(t, "1", AccountTypeClientDeposit, testDepositCurrency),
+		testDepositAccount(t, "2", AccountTypeBankCash, testDepositCurrency),
+	)
+	if err != nil {
+		t.Fatalf("NewDeposit() error = %v", err)
+	}
+	return deposit
+}
 
 func TestNewDeposit(t *testing.T) {
 	t.Parallel()
@@ -15,71 +53,91 @@ func TestNewDeposit(t *testing.T) {
 	t.Run("accepts a valid deposit", func(t *testing.T) {
 		t.Parallel()
 
-		deposit, err := NewDeposit(testID(t, "9"), testID(t, "1"), 2500, testDepositCurrency)
-		if err != nil {
-			t.Fatalf("NewDeposit() error = %v", err)
-		}
+		deposit := testValidDeposit(t)
 		if deposit.ID.String() != "9" {
 			t.Fatalf("ID = %s, want 9", deposit.ID)
 		}
-		if deposit.AccountID.String() != "1" {
-			t.Fatalf("AccountID = %s, want 1", deposit.AccountID)
+		if deposit.ClientAccount.ID.String() != "1" {
+			t.Fatalf("ClientAccount.ID = %s, want 1", deposit.ClientAccount.ID)
+		}
+		if deposit.BankAccount.ID.String() != "2" {
+			t.Fatalf("BankAccount.ID = %s, want 2", deposit.BankAccount.ID)
 		}
 		if deposit.AmountMinor != 2500 {
 			t.Fatalf("AmountMinor = %d, want 2500", deposit.AmountMinor)
 		}
-		if deposit.Currency != testDepositCurrency {
-			t.Fatalf("Currency = %q, want %q", deposit.Currency, testDepositCurrency)
+		if deposit.Currency.Code != testDepositCurrency {
+			t.Fatalf("Currency.Code = %q, want %q", deposit.Currency.Code, testDepositCurrency)
 		}
 	})
 
 	tests := []struct {
-		name      string
-		id        ID
-		accountID ID
-		amount    int64
-		currency  string
-		want      error
+		name   string
+		mutate func(*Deposit)
+		want   error
 	}{
 		{
-			name:      "rejects missing deposit ID",
-			id:        ID{},
-			accountID: testID(t, "1"),
-			amount:    2500,
-			currency:  testDepositCurrency,
-			want:      domain_errors.ErrDepositIDRequired,
+			name:   "rejects missing deposit ID",
+			mutate: func(d *Deposit) { d.ID = ID{} },
+			want:   domain_errors.ErrDepositIDRequired,
 		},
 		{
-			name:      "rejects missing account",
-			id:        testID(t, "9"),
-			accountID: ID{},
-			amount:    2500,
-			currency:  testDepositCurrency,
-			want:      domain_errors.ErrDepositAccountRequired,
+			name:   "rejects zero amount",
+			mutate: func(d *Deposit) { d.AmountMinor = 0 },
+			want:   domain_errors.ErrDepositAmountInvalid,
 		},
 		{
-			name:      "rejects zero amount",
-			id:        testID(t, "9"),
-			accountID: testID(t, "1"),
-			amount:    0,
-			currency:  testDepositCurrency,
-			want:      domain_errors.ErrDepositAmountInvalid,
+			name:   "rejects negative amount",
+			mutate: func(d *Deposit) { d.AmountMinor = -1 },
+			want:   domain_errors.ErrDepositAmountInvalid,
 		},
 		{
-			name:      "rejects negative amount",
-			id:        testID(t, "9"),
-			accountID: testID(t, "1"),
-			amount:    -2500,
-			currency:  testDepositCurrency,
-			want:      domain_errors.ErrDepositAmountInvalid,
+			name:   "rejects empty currency code",
+			mutate: func(d *Deposit) { d.Currency.Code = " " },
+			want:   domain_errors.ErrCurrencyCodeRequired,
 		},
 		{
-			name:      "rejects empty currency",
-			id:        testID(t, "9"),
-			accountID: testID(t, "1"),
-			amount:    2500,
-			currency:  "  ",
-			want:      domain_errors.ErrDepositCurrencyRequired,
+			name:   "rejects missing client account",
+			mutate: func(d *Deposit) { d.ClientAccount.ID = ID{} },
+			want:   domain_errors.ErrDepositClientAccountRequired,
+		},
+		{
+			name:   "rejects missing bank account",
+			mutate: func(d *Deposit) { d.BankAccount.ID = ID{} },
+			want:   domain_errors.ErrDepositBankAccountRequired,
+		},
+		{
+			name:   "rejects identical accounts",
+			mutate: func(d *Deposit) { d.BankAccount.ID = d.ClientAccount.ID },
+			want:   domain_errors.ErrDepositAccountsIdentical,
+		},
+		{
+			name: "rejects deleted client account",
+			mutate: func(d *Deposit) {
+				deleted := time.Now()
+				d.ClientAccount.DeletedAt = &deleted
+			},
+			want: domain_errors.ErrDepositAccountDeleted,
+		},
+		{
+			name:   "rejects client account that does not support deposits",
+			mutate: func(d *Deposit) { d.ClientAccount.Type = AccountTypeBankCash },
+			want:   domain_errors.ErrDepositClientAccountTypeUnsupported,
+		},
+		{
+			name:   "rejects bank account that cannot fund deposits",
+			mutate: func(d *Deposit) { d.BankAccount.Type = AccountTypeClientDeposit },
+			want:   domain_errors.ErrDepositBankAccountTypeUnsupported,
+		},
+		{
+			name:   "rejects client currency mismatch",
+			mutate: func(d *Deposit) { d.ClientAccount.Currency = "CNY" },
+			want:   domain_errors.ErrDepositClientCurrencyMismatch,
+		},
+		{
+			name:   "rejects bank currency mismatch",
+			mutate: func(d *Deposit) { d.BankAccount.Currency = "CNY" },
+			want:   domain_errors.ErrDepositBankCurrencyMismatch,
 		},
 	}
 
@@ -87,9 +145,11 @@ func TestNewDeposit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := NewDeposit(test.id, test.accountID, test.amount, test.currency)
-			if !errors.Is(err, test.want) {
-				t.Fatalf("NewDeposit() error = %v, want %v", err, test.want)
+			deposit := testValidDeposit(t)
+			test.mutate(&deposit)
+
+			if err := deposit.Validate(); !errors.Is(err, test.want) {
+				t.Fatalf("Validate() error = %v, want %v", err, test.want)
 			}
 		})
 	}

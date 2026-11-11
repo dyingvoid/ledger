@@ -29,5 +29,12 @@ CREATE TABLE ledger.account_info (
 CREATE INDEX account_info_user_id_idx ON ledger.account_info (user_id);
 CREATE INDEX account_info_currency_idx ON ledger.account_info (currency);
 CREATE INDEX account_info_account_type_idx ON ledger.account_info (account_type);
+CREATE INDEX account_info_account_type_currency_idx
+    ON ledger.account_info (account_type, currency)
+    WHERE deleted_at IS NULL;
+
+INSERT INTO ledger.account_type (code, name, description) VALUES
+    (1000, 'Bank''s Cash', 'Asset account for bank cash'),
+    (2100, 'Client''s Deposit', 'Liability account for client deposits');
 
 COMMIT;

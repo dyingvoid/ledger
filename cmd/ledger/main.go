@@ -15,6 +15,7 @@ import (
 	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
+	"github.com/dyingvoid/ledger/internal/core/currencies"
 	"github.com/dyingvoid/ledger/internal/core/deposits"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres/repositories"
@@ -90,6 +91,7 @@ func run() error {
 		grpcCfg,
 		log,
 		services.accounts,
+		services.currencies,
 		services.deposits,
 	)
 	if err != nil {
@@ -100,8 +102,9 @@ func run() error {
 }
 
 type services struct {
-	accounts *accounts.Service
-	deposits *deposits.Service
+	accounts   *accounts.Service
+	currencies *currencies.Service
+	deposits   *deposits.Service
 }
 
 func newServices(pool *pgxpool.Pool, tbClient tigerbeetle_go.Client) *services {
@@ -109,11 +112,12 @@ func newServices(pool *pgxpool.Pool, tbClient tigerbeetle_go.Client) *services {
 	accountInfos := repositories.NewAccounts(pool)
 
 	accountLedger := tbrepositories.NewAccounts(tbClient, currencyInfos)
-	depositLedger := tbrepositories.NewDeposits(tbClient, currencyInfos)
+	depositLedger := tbrepositories.NewDeposits(tbClient)
 
 	return &services{
-		accounts: accounts.NewService(accountInfos, accountLedger),
-		deposits: deposits.NewService(depositLedger),
+		accounts:   accounts.NewService(accountInfos, accountLedger),
+		currencies: currencies.NewService(currencyInfos),
+		deposits:   deposits.NewService(accountInfos, currencyInfos, depositLedger),
 	}
 }
 

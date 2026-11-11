@@ -144,8 +144,8 @@ func TestCreateAccountMapsFields(t *testing.T) {
 	if sent.ID != toTigerbeetleID(account.ID) {
 		t.Fatalf("ID = %s, want %s", sent.ID, account.ID)
 	}
-	if sent.UserData64 != 7 {
-		t.Fatalf("UserData64 = %d, want 7", sent.UserData64)
+	if sent.UserData64 != 0 {
+		t.Fatalf("UserData64 = %d, want 0", sent.UserData64)
 	}
 	if sent.Ledger != 1 {
 		t.Fatalf("Ledger = %d, want 1", sent.Ledger)
@@ -161,6 +161,24 @@ func TestCreateAccountMapsFields(t *testing.T) {
 	}
 	if created.ID != account.ID {
 		t.Fatalf("ID = %s, want %s", created.ID, account.ID)
+	}
+}
+
+func TestCreateAccountMapsClientUserData(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeClient{results: []tigerbeetle_go.CreateAccountResult{
+		{Status: tigerbeetle_go.AccountCreated},
+	}}
+	repository := NewAccounts(client, &fakeCurrencies{
+		info: domain.CurrencyInfo{Code: testUSD, Ledger: 1, AssetScale: 2},
+	})
+
+	if _, err := repository.Create(context.Background(), testAccount(t, 2100)); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if client.accounts[0].UserData64 != 7 {
+		t.Fatalf("UserData64 = %d, want 7", client.accounts[0].UserData64)
 	}
 }
 
