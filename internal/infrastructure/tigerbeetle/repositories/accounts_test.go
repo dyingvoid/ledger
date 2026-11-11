@@ -164,24 +164,51 @@ func TestCreateAccountMapsFields(t *testing.T) {
 	}
 }
 
-func TestCreateAccountCreditFlags(t *testing.T) {
+func TestCreateAccountFlags(t *testing.T) {
 	t.Parallel()
 
-	client := &fakeClient{results: []tigerbeetle_go.CreateAccountResult{
-		{Status: tigerbeetle_go.AccountCreated},
-	}}
-	repository := NewAccounts(client, &fakeCurrencies{info: domain.CurrencyInfo{Ledger: 1}})
-
-	if _, err := repository.Create(context.Background(), testAccount(t, 2100)); err != nil {
-		t.Fatalf("Create() error = %v", err)
+	tests := []struct {
+		name                 string
+		accountType          domain.AccountType
+		wantCreditsNotExceed bool
+		wantDebitsNotExceed  bool
+	}{
+		{name: "asset", accountType: 1000, wantCreditsNotExceed: true},
+		{name: "liability", accountType: 2100, wantDebitsNotExceed: true},
+		{name: "equity", accountType: 3100, wantDebitsNotExceed: true},
+		{name: "revenue", accountType: 4100, wantDebitsNotExceed: true},
+		{name: "expense", accountType: 5100, wantCreditsNotExceed: true},
 	}
 
-	flags := client.accounts[0].AccountFlags()
-	if !flags.DebitsMustNotExceedCredits {
-		t.Fatalf("DebitsMustNotExceedCredits = false, want true")
-	}
-	if flags.CreditsMustNotExceedDebits {
-		t.Fatalf("CreditsMustNotExceedDebits = true, want false")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := &fakeClient{results: []tigerbeetle_go.CreateAccountResult{
+				{Status: tigerbeetle_go.AccountCreated},
+			}}
+			repository := NewAccounts(client, &fakeCurrencies{info: domain.CurrencyInfo{Ledger: 1}})
+
+			if _, err := repository.Create(context.Background(), testAccount(t, test.accountType)); err != nil {
+				t.Fatalf("Create() error = %v", err)
+			}
+
+			flags := client.accounts[0].AccountFlags()
+			if flags.CreditsMustNotExceedDebits != test.wantCreditsNotExceed {
+				t.Fatalf(
+					"CreditsMustNotExceedDebits = %t, want %t",
+					flags.CreditsMustNotExceedDebits,
+					test.wantCreditsNotExceed,
+				)
+			}
+			if flags.DebitsMustNotExceedCredits != test.wantDebitsNotExceed {
+				t.Fatalf(
+					"DebitsMustNotExceedCredits = %t, want %t",
+					flags.DebitsMustNotExceedCredits,
+					test.wantDebitsNotExceed,
+				)
+			}
+		})
 	}
 }
 

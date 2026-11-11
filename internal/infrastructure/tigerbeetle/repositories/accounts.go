@@ -78,19 +78,19 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 }
 
 func accountFlags(account domain.Account) (uint16, error) {
-	side, err := account.NormalBalance()
+	category, err := account.Type.Category()
 	if err != nil {
-		return 0, fmt.Errorf("determining account normal balance: %w", err)
+		return 0, fmt.Errorf("determining account category: %w", err)
 	}
 
 	flags := tigerbeetle_go.AccountFlags{}
-	switch side {
-	case domain.Debit:
+	switch category {
+	case domain.AccountCategoryAsset, domain.AccountCategoryExpense:
 		flags.CreditsMustNotExceedDebits = true
-	case domain.Credit:
+	case domain.AccountCategoryLiability, domain.AccountCategoryEquity, domain.AccountCategoryRevenue:
 		flags.DebitsMustNotExceedCredits = true
 	default:
-		return 0, fmt.Errorf("invalid account balance side: %d", side)
+		return 0, fmt.Errorf("invalid account category: %d", category)
 	}
 
 	return flags.ToUint16(), nil

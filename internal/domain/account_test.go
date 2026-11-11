@@ -120,6 +120,47 @@ func TestAccountTypeNormalBalance(t *testing.T) {
 	}
 }
 
+func TestAccountTypeCategory(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		accountType AccountType
+		want        AccountCategory
+	}{
+		{name: "asset lower bound", accountType: 1000, want: AccountCategoryAsset},
+		{name: "asset upper bound", accountType: 1999, want: AccountCategoryAsset},
+		{name: "liability lower bound", accountType: 2000, want: AccountCategoryLiability},
+		{name: "liability upper bound", accountType: 2999, want: AccountCategoryLiability},
+		{name: "equity lower bound", accountType: 3000, want: AccountCategoryEquity},
+		{name: "equity upper bound", accountType: 3999, want: AccountCategoryEquity},
+		{name: "revenue lower bound", accountType: 4000, want: AccountCategoryRevenue},
+		{name: "revenue upper bound", accountType: 4999, want: AccountCategoryRevenue},
+		{name: "expense lower bound", accountType: 5000, want: AccountCategoryExpense},
+		{name: "expense upper bound", accountType: 5999, want: AccountCategoryExpense},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			category, err := test.accountType.Category()
+			if err != nil {
+				t.Fatalf("Category() error = %v", err)
+			}
+			if category != test.want {
+				t.Fatalf("Category() = %d, want %d", category, test.want)
+			}
+		})
+	}
+
+	for _, accountType := range []AccountType{999, 6000} {
+		if _, err := accountType.Category(); !errors.Is(err, domain_errors.ErrAccountTypeInvalid) {
+			t.Fatalf("Category() error = %v, want %v", err, domain_errors.ErrAccountTypeInvalid)
+		}
+	}
+}
+
 func TestAccountTypeValidate(t *testing.T) {
 	t.Parallel()
 

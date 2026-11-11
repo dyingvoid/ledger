@@ -8,9 +8,6 @@ import (
 	"github.com/dyingvoid/ledger/internal/logger"
 )
 
-// OpenLedgerAccount adds an existing account metadata record to TigerBeetle.
-// TigerBeetle's create-account operation is idempotent by ID, so repeated calls
-// for the same account are safe.
 func (s *Service) OpenLedgerAccount(ctx context.Context, id domain.ID) (domain.Account, error) {
 	account, err := s.infos.Get(ctx, id)
 	if err != nil {
