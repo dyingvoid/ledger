@@ -110,7 +110,10 @@ type services struct {
 	idempotencyService *idempotency.Service
 }
 
-const useTigerBeetleAccounts = true
+const (
+	useTigerBeetleAccounts = true
+	useTigerBeetleDeposits = true
+)
 
 func newServices(pool *pgxpool.Pool, tbClient tigerbeetle_go.Client) (*services, error) {
 	idempotencyCfg, err := idempotency.LoadConfig()
@@ -130,9 +133,14 @@ func newServices(pool *pgxpool.Pool, tbClient tigerbeetle_go.Client) (*services,
 		accountWriter = tbrepositories.NewAccounts(tbClient, currencies)
 	}
 
+	var depositWriter deposits.Repository = depositRepository
+	if useTigerBeetleDeposits {
+		depositWriter = tbrepositories.NewDeposits(tbClient, currencies)
+	}
+
 	return &services{
 		accounts:           accounts.NewService(accountWriter, accountTypes, currencies),
-		deposits:           deposits.NewService(depositRepository),
+		deposits:           deposits.NewService(depositWriter),
 		idempotencyService: idempotencyService,
 	}, nil
 }

@@ -85,6 +85,7 @@ type DepositResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	JournalEntryId int64                  `protobuf:"varint,1,opt,name=journal_entry_id,json=journalEntryId,proto3" json:"journal_entry_id,omitempty"`
 	Replayed       bool                   `protobuf:"varint,2,opt,name=replayed,proto3" json:"replayed,omitempty"`
+	TransferId     string                 `protobuf:"bytes,3,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -133,6 +134,13 @@ func (x *DepositResponse) GetReplayed() bool {
 	return false
 }
 
+func (x *DepositResponse) GetTransferId() string {
+	if x != nil {
+		return x.TransferId
+	}
+	return ""
+}
+
 var File_ledger_funds_v1_funds_proto protoreflect.FileDescriptor
 
 const file_ledger_funds_v1_funds_proto_rawDesc = "" +
@@ -142,10 +150,12 @@ const file_ledger_funds_v1_funds_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\x03R\taccountId\x12!\n" +
 	"\famount_minor\x18\x02 \x01(\x03R\vamountMinor\x12\x1a\n" +
-	"\bcurrency\x18\x03 \x01(\tR\bcurrency\"W\n" +
+	"\bcurrency\x18\x03 \x01(\tR\bcurrency\"x\n" +
 	"\x0fDepositResponse\x12(\n" +
 	"\x10journal_entry_id\x18\x01 \x01(\x03R\x0ejournalEntryId\x12\x1a\n" +
-	"\breplayed\x18\x02 \x01(\bR\breplayed2\\\n" +
+	"\breplayed\x18\x02 \x01(\bR\breplayed\x12\x1f\n" +
+	"\vtransfer_id\x18\x03 \x01(\tR\n" +
+	"transferId2\\\n" +
 	"\fFundsService\x12L\n" +
 	"\aDeposit\x12\x1f.ledger.funds.v1.DepositRequest\x1a .ledger.funds.v1.DepositResponseB?Z=github.com/dyingvoid/ledger/pkg/proto/ledger/funds/v1;fundsv1b\x06proto3"
 

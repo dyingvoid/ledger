@@ -8,6 +8,8 @@ import (
 	"github.com/dyingvoid/ledger/internal/domain"
 )
 
+const testCurrency domain.Currency = "USD"
+
 type fakeDepositRepository struct {
 	createErr   error
 	created     domain.Deposit
@@ -38,7 +40,7 @@ func TestAddDeposit(t *testing.T) {
 		deposit, err := service.AddDeposit(context.Background(), AddDepositParams{
 			AccountID:   7,
 			AmountMinor: 2500,
-			Currency:    "USD",
+			Currency:    testCurrency,
 		})
 		if err != nil {
 			t.Fatalf("AddDeposit() error = %v", err)
@@ -54,6 +56,38 @@ func TestAddDeposit(t *testing.T) {
 		}
 	})
 
+	t.Run("accepts an external account ID", func(t *testing.T) {
+		t.Parallel()
+
+		repository := &fakeDepositRepository{}
+		service := NewService(repository)
+
+		externalAccountID, err := domain.ParseExternalID("42")
+		if err != nil {
+			t.Fatalf("ParseExternalID() error = %v", err)
+		}
+		transferID, err := domain.ParseExternalID("99")
+		if err != nil {
+			t.Fatalf("ParseExternalID() error = %v", err)
+		}
+
+		deposit, err := service.AddDeposit(context.Background(), AddDepositParams{
+			ExternalAccountID: externalAccountID,
+			TransferID:        transferID,
+			AmountMinor:       2500,
+			Currency:          testCurrency,
+		})
+		if err != nil {
+			t.Fatalf("AddDeposit() error = %v", err)
+		}
+		if deposit.ExternalAccountID != externalAccountID {
+			t.Fatalf("ExternalAccountID = %s, want %s", deposit.ExternalAccountID, externalAccountID)
+		}
+		if deposit.TransferID != transferID {
+			t.Fatalf("TransferID = %s, want %s", deposit.TransferID, transferID)
+		}
+	})
+
 	t.Run("rejects invalid deposit before calling the repository", func(t *testing.T) {
 		t.Parallel()
 
@@ -63,7 +97,7 @@ func TestAddDeposit(t *testing.T) {
 		_, err := service.AddDeposit(context.Background(), AddDepositParams{
 			AccountID:   7,
 			AmountMinor: 0,
-			Currency:    "USD",
+			Currency:    testCurrency,
 		})
 		if !errors.Is(err, domain.ErrDepositAmountInvalid) {
 			t.Fatalf("AddDeposit() error = %v, want %v", err, domain.ErrDepositAmountInvalid)
@@ -83,7 +117,7 @@ func TestAddDeposit(t *testing.T) {
 		_, err := service.AddDeposit(context.Background(), AddDepositParams{
 			AccountID:   7,
 			AmountMinor: 2500,
-			Currency:    "USD",
+			Currency:    testCurrency,
 		})
 		if !errors.Is(err, saveErr) {
 			t.Fatalf("AddDeposit() error = %v, want %v", err, saveErr)

@@ -63,6 +63,7 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 	}
 
 	result := results[0]
+	//nolint:exhaustive // Unknown statuses fall through to the generic error.
 	switch result.Status {
 	case tigerbeetle_go.AccountCreated, tigerbeetle_go.AccountExists:
 		account.CreatedAt = time.Unix(0, int64(result.Timestamp)).UTC() //nolint:gosec // TigerBeetle timestamps are nanoseconds well below int64 max.

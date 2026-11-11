@@ -17,4 +17,5 @@ message DepositRequest {
 message DepositResponse {
   int64 journal_entry_id = 1;
   bool replayed = 2;
+  string transfer_id = 3;
 }

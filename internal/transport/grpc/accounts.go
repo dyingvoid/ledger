@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"strconv"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -31,15 +32,15 @@ func (s *accountService) CreateAccount(
 	ctx context.Context,
 	req *accountsv1.CreateAccountRequest,
 ) (*accountsv1.CreateAccountResponse, error) {
-	key, err := idempotencyKey(ctx, "accounts.create_account", req.GetUserId())
+	identity, err := parseRequestIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	externalID, err := externalID(ctx)
-	if err != nil {
-		return nil, err
-	}
+	key := identity.scopedKey(
+		"accounts.create_account",
+		strconv.FormatInt(req.GetUserId(), 10),
+	)
 
 	account, replayed, err := s.idempotencyService.Execute(ctx, key, func(ctx context.Context) (domain.Account, error) {
 		return s.accounts.CreateAccount(ctx, accounts.CreateAccountParams{
@@ -48,7 +49,7 @@ func (s *accountService) CreateAccount(
 			Description: req.GetDescription(),
 			Type:        domain.AccountType(req.GetType()),
 			Currency:    domain.Currency(req.GetCurrency()),
-			ExternalID:  externalID,
+			ExternalID:  identity.externalID,
 		})
 	})
 	if err != nil {

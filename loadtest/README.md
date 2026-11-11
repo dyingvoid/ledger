@@ -16,9 +16,11 @@ message DepositRequest {
 }
 ```
 
-Every request also needs `x-idempotency-key` metadata. The server turns it into
-`funds.deposit:<account_id>:<key>`, so a key that repeats for the same account
-is a replay, not a new deposit. The k6 script sends a unique key per request.
+Every request also needs `x-idempotency-key` metadata. The last segment after
+`:` is the external account ID, so the load test sends
+`<unique-run-key>:<account_id>`. The server scopes the key by that external
+account ID, so a key that repeats for the same account is a replay, not a new
+deposit. The k6 script sends a unique key per request.
 
 The server registers gRPC reflection, so k6 does not need a local copy of the
 `.proto` file. Set `REFLECT=false` to load `proto/ledger/funds/v1/funds.proto`

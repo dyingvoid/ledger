@@ -211,9 +211,9 @@ export default function () {
       },
       {
         metadata: {
-          // The server scopes this by account id, but a unique key per request
-          // is what makes this an actual deposit instead of a replay.
-          'x-idempotency-key': `lt-${RUN_ID}-${seq}`,
+          // The last segment is the external account ID required by the server.
+          // A unique key per request makes this an actual deposit, not a replay.
+          'x-idempotency-key': `lt-${RUN_ID}-${seq}:${accountId}`,
         },
         tags,
         timeout: RPC_TIMEOUT,

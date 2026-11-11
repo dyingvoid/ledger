@@ -12,11 +12,22 @@ import (
 	"github.com/dyingvoid/ledger/internal/domain"
 )
 
+const testUSD domain.Currency = "USD"
+
 type fakeClient struct {
 	results  []tigerbeetle_go.CreateAccountResult
 	err      error
 	accounts []tigerbeetle_go.Account
 	calls    int
+
+	transferResults   []tigerbeetle_go.CreateTransferResult
+	transferErr       error
+	transfers         []tigerbeetle_go.Transfer
+	transferCalls     int
+	lookupAccounts    []tigerbeetle_go.Account
+	lookupAccountIDs  []tigerbeetle_go.Uint128
+	lookupTransfers   []tigerbeetle_go.Transfer
+	lookupTransferIDs []tigerbeetle_go.Uint128
 }
 
 func (f *fakeClient) CreateAccounts(accounts []tigerbeetle_go.Account) ([]tigerbeetle_go.CreateAccountResult, error) {
@@ -28,16 +39,27 @@ func (f *fakeClient) CreateAccounts(accounts []tigerbeetle_go.Account) ([]tigerb
 	return f.results, nil
 }
 
-func (f *fakeClient) CreateTransfers([]tigerbeetle_go.Transfer) ([]tigerbeetle_go.CreateTransferResult, error) {
-	return nil, nil
+func (f *fakeClient) CreateTransfers(transfers []tigerbeetle_go.Transfer) ([]tigerbeetle_go.CreateTransferResult, error) {
+	index := f.transferCalls
+	f.transferCalls++
+	f.transfers = transfers
+	if f.transferErr != nil {
+		return nil, f.transferErr
+	}
+	if index < len(f.transferResults) {
+		return f.transferResults[index : index+1], nil
+	}
+	return f.transferResults, nil
 }
 
-func (f *fakeClient) LookupAccounts([]tigerbeetle_go.Uint128) ([]tigerbeetle_go.Account, error) {
-	return nil, nil
+func (f *fakeClient) LookupAccounts(ids []tigerbeetle_go.Uint128) ([]tigerbeetle_go.Account, error) {
+	f.lookupAccountIDs = ids
+	return f.lookupAccounts, nil
 }
 
-func (f *fakeClient) LookupTransfers([]tigerbeetle_go.Uint128) ([]tigerbeetle_go.Transfer, error) {
-	return nil, nil
+func (f *fakeClient) LookupTransfers(ids []tigerbeetle_go.Uint128) ([]tigerbeetle_go.Transfer, error) {
+	f.lookupTransferIDs = ids
+	return f.lookupTransfers, nil
 }
 
 func (f *fakeClient) GetAccountTransfers(tigerbeetle_go.AccountFilter) ([]tigerbeetle_go.Transfer, error) {
@@ -91,7 +113,7 @@ func testAccount(t *testing.T, accountType domain.AccountType) domain.Account {
 		UserID:     7,
 		Name:       "Daily",
 		Type:       accountType,
-		Currency:   "USD",
+		Currency:   testUSD,
 	}
 }
 
@@ -102,7 +124,7 @@ func TestCreateAccountMapsFields(t *testing.T) {
 		{Status: tigerbeetle_go.AccountCreated, Timestamp: 1_000_000_000},
 	}}
 	repository := NewAccounts(client, &fakeCurrencies{
-		info: domain.CurrencyInfo{Code: "USD", Ledger: 1, AssetScale: 2},
+		info: domain.CurrencyInfo{Code: testUSD, Ledger: 1, AssetScale: 2},
 	})
 
 	account := testAccount(t, 1000)

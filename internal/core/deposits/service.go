@@ -2,10 +2,17 @@ package deposits
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dyingvoid/ledger/internal/domain"
 	"github.com/dyingvoid/ledger/internal/logger"
+)
+
+var (
+	ErrDepositStoreUnavailable = errors.New("deposit store unavailable")
+	ErrDepositConflict         = errors.New("deposit conflicts with an existing transfer")
+	ErrTransferIDRequired      = errors.New("deposit transfer ID is required")
 )
 
 type Repository interface {
@@ -21,16 +28,25 @@ func NewService(deposits Repository) *Service {
 }
 
 type AddDepositParams struct {
-	AccountID   int64
-	AmountMinor int64
-	Currency    domain.Currency
+	AccountID         int64
+	ExternalAccountID domain.ExternalID
+	TransferID        domain.ExternalID
+	AmountMinor       int64
+	Currency          domain.Currency
 }
 
 func (s *Service) AddDeposit(ctx context.Context, params AddDepositParams) (domain.Deposit, error) {
-	deposit, err := domain.NewDeposit(params.AccountID, params.AmountMinor, params.Currency)
+	deposit, err := domain.NewDeposit(
+		params.AccountID,
+		params.ExternalAccountID,
+		params.AmountMinor,
+		params.Currency,
+	)
 	if err != nil {
 		return domain.Deposit{}, fmt.Errorf("validating deposit: %w", err)
 	}
+
+	deposit.TransferID = params.TransferID
 
 	created, err := s.deposits.Create(ctx, deposit)
 	if err != nil {
@@ -41,7 +57,9 @@ func (s *Service) AddDeposit(ctx context.Context, params AddDepositParams) (doma
 		ctx,
 		"deposit added",
 		"account_id", created.AccountID,
+		"external_account_id", created.ExternalAccountID.String(),
 		"journal_entry_id", created.JournalEntryID,
+		"transfer_id", created.TransferID.String(),
 		"amount_minor", created.AmountMinor,
 		"currency", created.Currency,
 	)

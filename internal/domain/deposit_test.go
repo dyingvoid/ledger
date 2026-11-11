@@ -13,7 +13,7 @@ func TestNewDeposit(t *testing.T) {
 	t.Run("accepts valid deposit", func(t *testing.T) {
 		t.Parallel()
 
-		deposit, err := NewDeposit(7, 2500, testDepositCurrency)
+		deposit, err := NewDeposit(7, ExternalID{}, 2500, testDepositCurrency)
 		if err != nil {
 			t.Fatalf("NewDeposit() error = %v", err)
 		}
@@ -25,6 +25,23 @@ func TestNewDeposit(t *testing.T) {
 		}
 		if deposit.Currency != testDepositCurrency {
 			t.Fatalf("Currency = %q, want %q", deposit.Currency, "USD")
+		}
+	})
+
+	t.Run("accepts external account reference", func(t *testing.T) {
+		t.Parallel()
+
+		externalAccountID, err := ParseExternalID("42")
+		if err != nil {
+			t.Fatalf("ParseExternalID() error = %v", err)
+		}
+
+		deposit, err := NewDeposit(0, externalAccountID, 2500, testDepositCurrency)
+		if err != nil {
+			t.Fatalf("NewDeposit() error = %v", err)
+		}
+		if deposit.ExternalAccountID != externalAccountID {
+			t.Fatalf("ExternalAccountID = %s, want %s", deposit.ExternalAccountID, externalAccountID)
 		}
 	})
 
@@ -69,7 +86,7 @@ func TestNewDeposit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := NewDeposit(test.accountID, test.amountMinor, test.currency)
+			_, err := NewDeposit(test.accountID, ExternalID{}, test.amountMinor, test.currency)
 			if !errors.Is(err, test.want) {
 				t.Fatalf("NewDeposit() error = %v, want %v", err, test.want)
 			}

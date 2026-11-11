@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
 	grpcpkg "google.golang.org/grpc"
@@ -18,41 +17,38 @@ const (
 	idempotencyReplayedHeader = "x-idempotent-replayed"
 )
 
-func idempotencyKey(ctx context.Context, operation string, scope int64) (string, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return "", status.Errorf(codes.InvalidArgument, "%s metadata is required", idempotencyKeyHeader)
-	}
-
-	values := md.Get(idempotencyKeyHeader)
-	if len(values) == 0 || strings.TrimSpace(values[0]) == "" {
-		return "", status.Errorf(codes.InvalidArgument, "%s metadata is required", idempotencyKeyHeader)
-	}
-
-	return operation + ":" + strconv.FormatInt(scope, 10) + ":" + strings.TrimSpace(values[0]), nil
+type requestIdentity struct {
+	key        string
+	externalID domain.ExternalID
 }
 
-func externalID(ctx context.Context) (domain.ExternalID, error) {
+func parseRequestIdentity(ctx context.Context) (requestIdentity, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return domain.ExternalID{}, status.Errorf(codes.InvalidArgument, "%s metadata is required", idempotencyKeyHeader)
+		return requestIdentity{}, status.Errorf(codes.InvalidArgument, "%s metadata is required", idempotencyKeyHeader)
 	}
 
 	values := md.Get(idempotencyKeyHeader)
 	if len(values) == 0 || strings.TrimSpace(values[0]) == "" {
-		return domain.ExternalID{}, status.Errorf(codes.InvalidArgument, "%s metadata is required", idempotencyKeyHeader)
+		return requestIdentity{}, status.Errorf(codes.InvalidArgument, "%s metadata is required", idempotencyKeyHeader)
 	}
 
-	value := strings.TrimSpace(values[0])
-	if index := strings.LastIndex(value, ":"); index >= 0 {
-		value = value[index+1:]
+	key := strings.TrimSpace(values[0])
+	externalValue := key
+	if index := strings.LastIndex(externalValue, ":"); index >= 0 {
+		externalValue = externalValue[index+1:]
 	}
 
-	id, err := domain.ParseExternalID(value)
+	externalID, err := domain.ParseExternalID(externalValue)
 	if err != nil {
-		return domain.ExternalID{}, status.Error(codes.InvalidArgument, err.Error())
+		return requestIdentity{}, status.Error(codes.InvalidArgument, err.Error())
 	}
-	return id, nil
+
+	return requestIdentity{key: key, externalID: externalID}, nil
+}
+
+func (i requestIdentity) scopedKey(operation string, scope string) string {
+	return operation + ":" + scope + ":" + i.key
 }
 
 func setReplayHeader(ctx context.Context, replayed bool) error {

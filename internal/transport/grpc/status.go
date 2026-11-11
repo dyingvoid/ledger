@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
+	"github.com/dyingvoid/ledger/internal/core/deposits"
 	"github.com/dyingvoid/ledger/internal/core/idempotency"
 	"github.com/dyingvoid/ledger/internal/domain"
 )
@@ -24,9 +25,12 @@ func toStatus(err error) error {
 		return status.Error(codes.Aborted, err.Error())
 	case errors.Is(err, domain.ErrDepositAccountNotFound):
 		return status.Error(codes.NotFound, err.Error())
+	case errors.Is(err, deposits.ErrDepositConflict):
+		return status.Error(codes.AlreadyExists, err.Error())
 	case errors.Is(err, accounts.ErrAccountIDConflict):
 		return status.Error(codes.AlreadyExists, err.Error())
-	case errors.Is(err, accounts.ErrAccountStoreUnavailable):
+	case errors.Is(err, accounts.ErrAccountStoreUnavailable),
+		errors.Is(err, deposits.ErrDepositStoreUnavailable):
 		return status.Error(codes.Unavailable, err.Error())
 	case errors.Is(err, idempotency.ErrKeyRequired),
 		errors.Is(err, idempotency.ErrKeyTooLong),

@@ -12,7 +12,7 @@ services:
       POSTGRES_MAX_CONN_IDLE_TIME: ${POSTGRES_MAX_CONN_IDLE_TIME:-30m}
       POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-5s}
       TIGERBEETLE_CLUSTER_ID: ${TIGERBEETLE_CLUSTER_ID:-0}
-      TIGERBEETLE_ADDRESSES: tigerbeetle:3000
+      TIGERBEETLE_ADDRESSES: ${TIGERBEETLE_IP:-172.28.0.2}:3000
       IDEMPOTENCY_TTL: ${IDEMPOTENCY_TTL:-24h}
       GRPC_ADDR: ${GRPC_ADDR:-:50051}
     depends_on:
@@ -22,6 +22,8 @@ services:
         condition: service_started
     ports:
       - "${GRPC_PORT:-50051}:50051"
+    security_opt:
+      - seccomp=unconfined
 
   postgres:
     image: postgres:17.6-alpine
@@ -55,6 +57,9 @@ services:
       - tigerbeetle-data:/data
     security_opt:
       - seccomp=unconfined
+    networks:
+      default:
+        ipv4_address: ${TIGERBEETLE_IP:-172.28.0.2}
 
   migrate:
     image: migrate/migrate:v4.19.1
@@ -77,6 +82,12 @@ services:
       - ${PROJECT_ROOT:-.}:/app
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/root/.cache
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${DOCKER_SUBNET:-172.28.0.0/16}
 
 volumes:
   postgres-data:

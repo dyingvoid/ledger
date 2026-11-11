@@ -13,7 +13,7 @@ export default function () {
   const response = client.invoke(
     'ledger.funds.v1.FundsService/Deposit',
     { account_id: 900000, amount_minor: 100, currency: 'USD' },
-    { metadata: { 'x-idempotency-key': 'probe-' + Date.now() } }
+    { metadata: { 'x-idempotency-key': 'probe-' + Date.now() + ':900000' } }
   );
   const s = response.status;
   console.log('STATUS=', s, 'TYPE=', typeof s, 'STRING=', String(s), 'NUMBER=', Number(s));

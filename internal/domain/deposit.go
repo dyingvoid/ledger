@@ -15,17 +15,25 @@ var (
 )
 
 type Deposit struct {
-	JournalEntryID int64    `json:"journal_entry_id"`
-	AccountID      int64    `json:"account_id"`
-	AmountMinor    int64    `json:"amount_minor"`
-	Currency       Currency `json:"currency"`
+	JournalEntryID    int64      `json:"journal_entry_id"`
+	TransferID        ExternalID `json:"transfer_id"`
+	AccountID         int64      `json:"account_id"`
+	ExternalAccountID ExternalID `json:"external_account_id"`
+	AmountMinor       int64      `json:"amount_minor"`
+	Currency          Currency   `json:"currency"`
 }
 
-func NewDeposit(accountID int64, amountMinor int64, currency Currency) (Deposit, error) {
+func NewDeposit(
+	accountID int64,
+	externalAccountID ExternalID,
+	amountMinor int64,
+	currency Currency,
+) (Deposit, error) {
 	deposit := Deposit{
-		AccountID:   accountID,
-		AmountMinor: amountMinor,
-		Currency:    currency,
+		AccountID:         accountID,
+		ExternalAccountID: externalAccountID,
+		AmountMinor:       amountMinor,
+		Currency:          currency,
 	}
 	if err := deposit.Validate(); err != nil {
 		return Deposit{}, err
@@ -34,7 +42,7 @@ func NewDeposit(accountID int64, amountMinor int64, currency Currency) (Deposit,
 }
 
 func (d Deposit) Validate() error {
-	if d.AccountID <= 0 {
+	if d.AccountID <= 0 && d.ExternalAccountID.IsZero() {
 		return ErrDepositAccountRequired
 	}
 	if d.AmountMinor <= 0 {

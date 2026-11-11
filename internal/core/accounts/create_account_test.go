@@ -65,6 +65,7 @@ func newTestService(
 	return NewService(accounts, accountTypes, currencies)
 }
 
+//nolint:gocyclo,funlen // The validation subtests are clearer together.
 func TestCreateAccount(t *testing.T) {
 	t.Parallel()
 

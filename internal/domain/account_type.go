@@ -8,6 +8,9 @@ import (
 var ErrAccountTypeInvalid = errors.New("account type must be a four digit code between 1000 and 5999")
 
 const (
+	AccountTypeBankCash      AccountType = 1000
+	AccountTypeClientDeposit AccountType = 2100
+
 	minAccountType AccountType = 1000
 	maxAccountType AccountType = 5999
 )
