@@ -1,8 +1,13 @@
 # Deposit load test
 
-Load test for `ledger.funds.v1.FundsService/Deposit`.
+k6 load tests for ledger:
 
-The service exposes exactly one write path relevant here:
+- `accounts.js` creates accounts through `AccountService/CreateAccount`,
+  ids `1,2,3,...` until a `1m` deadline;
+- `deposit.js` deposits through `FundsService/Deposit`, ids also starting at
+  `1`, until a `1m` deadline (or at a steady/ramp arrival rate).
+
+The deposit service exposes exactly one write path relevant here:
 
 ```proto
 service FundsService {
@@ -60,88 +65,54 @@ and can be overridden with `VUS`.
 
 ## 1. Accounts
 
-Migration `000005_seed_deposit_accounts` creates the 15,000,000 client deposit
-accounts directly in Postgres on a fresh database, in one transaction. The load
-test itself creates no accounts: `deposit.js` only calls
-`FundsService/Deposit`.
+Accounts are created through the gRPC `AccountService/CreateAccount` endpoint
+by `loadtest/accounts.js`. Each iteration creates one account: account ids
+start at `ACCOUNT_MIN_ID` (default `1`) and increase by one until the
+`DURATION` deadline (default `1m`).
 
-On a fresh database the seeded range is ids `4` through `15000003`
-(ids 1–3 are the bank cash accounts). `loadtest/seed.env` records that range as
-`ACCOUNT_MIN_ID`, `ACCOUNT_MAX_ID`, and `ACCOUNT_COUNT`; keep it in sync if your
-database already had accounts before the migration ran.
-
-Verify the range after `make migrate-up`:
+The idempotency key ends with the account id, so the server stores the account
+in TigerBeetle under that id. Creating an account that already exists is
+treated as success: the run counts it as `exists` and continues.
 
 ```bash
-docker compose exec -T postgres psql -U ledger -d ledger -c \
-  "SELECT count(*), min(id), max(id)
-   FROM ledger.account
-   WHERE account_type = 2100 AND currency = 'USD';"
+# create as many accounts as possible in 1 minute, starting at id 1
+make loadtest-accounts
+
+# or run k6 directly
+k6 run -e DURATION=1m -e VUS=50 -e ACCOUNT_MIN_ID=1 loadtest/accounts.js
 ```
 
-Expected: `15000000`, `4`, `15000003`.
+The account range in `loadtest/seed.env` is `1` through `15000000`. Raise
+`ACCOUNT_MIN_ID` to continue from where a previous run stopped.
 
-The deposit function also needs a bank cash account (`account_type = 1000`) in
-the deposit currency; the migration creates one per seeded currency.
+The deposit path also needs a bank cash account (`account_type = 1000`) in the
+deposit currency. The TigerBeetle deposit repository creates it lazily on the
+first deposit.
 
 ## 2. Prepare the service
 
-The defaults in `docker-compose.yml` are not a throughput configuration:
-
-```bash
-POSTGRES_MAX_CONNS=10 docker compose up -d --build --wait
-```
-
-Each deposit is one Postgres transaction that inserts/updates an idempotency
-row and calls `ledger.add_deposit()`. With 10 pool connections, throughput is
-bounded by `10 / transaction_duration`. Raise `POSTGRES_MAX_CONNS` (and
-Postgres `max_connections`) before drawing conclusions:
+The defaults in `docker-compose.yml` are not a throughput configuration.
+The idempotency store and the account/currency reference data still live in
+Postgres, so raise its connection limit before drawing conclusions:
 
 ```bash
 POSTGRES_MAX_CONNS=100 docker compose up -d --build --wait
 ```
 
-Also consider `LOG_LEVEL=warn` during the benchmark. At `info`, every deposit
-writes a JSON log line, which is real work but usually not the bottleneck.
+Deposits themselves are written to TigerBeetle. Each deposit is still one
+idempotency transaction in Postgres, so throughput is bounded by Postgres
+round-trips plus the TigerBeetle transfer.
 
-### Important: the bank cash row is a global lock
-
-`ledger.add_deposit()` runs this before writing:
-
-```sql
-SELECT a.id
-FROM ledger.account a
-WHERE a.account_type = 1000
-  AND a.currency = p_currency
-  AND a.deleted_at IS NULL
-ORDER BY a.id
-LIMIT 1
-FOR UPDATE;
-```
-
-Every deposit in a currency takes a `FOR UPDATE` lock on **the same bank cash
-account row**, then updates that row (`dr = dr + amount`). Deposits in one
-currency are therefore serialized at the database, regardless of how many app
-instances or gRPC connections you add. The 174/s daily target is the test
-that will expose this. Running the test with one currency measures the worst
-case; multiple currencies get one lock domain each.
-
-If the service saturates well below 174/s while Postgres CPU is low, look at:
-
-```sql
-SELECT pid, wait_event_type, wait_event, state, query
-FROM pg_stat_activity
-WHERE datname = current_database();
-
-SELECT relation::regclass, mode, granted, count(*)
-FROM pg_locks
-WHERE relation = 'ledger.account'::regclass
-GROUP BY 1, 2, 3;
-```
+Also consider `LOG_LEVEL=warn` during the benchmark. At `info`, every account
+creation and deposit writes a JSON log line, which is real work but usually not
+the bottleneck.
 
 ## 3. Run the test
 
 ```bash
+# 1 minute, ids 1,2,3,... until the deadline, as fast as the service allows
+make loadtest-deposit
+
 # all three rates, 1 minute each
 ./loadtest/run-matrix.sh
 ```
@@ -151,11 +122,15 @@ or one rate:
 ```bash
 set -a; . ./.env; . ./loadtest/seed.env; set +a
 k6 run \
-  -e RATE=174 -e DURATION=1m \
+  -e MODE=steady -e RATE=174 -e DURATION=1m \
   -e ACCOUNT_MIN_ID="$ACCOUNT_MIN_ID" \
   -e ACCOUNT_COUNT=5000000 \
   loadtest/deposit.js
 ```
+
+`MODE=deadline` (the default) uses `VUS` concurrent workers for `DURATION`
+and increases the account id every iteration. `MODE=steady` uses a
+constant arrival rate; `MODE=ramp` increases it until saturation.
 
 k6 exits with code `99` when a threshold is crossed. That is expected in a
 saturation run and is not a script failure; the runner treats it as a normal
@@ -212,30 +187,30 @@ A useful result table:
 
 ## 5. Test design notes and limits
 
-- **Account reuse.** `exec.scenario.iterationInTest` is a global, zero-based
-  iteration counter, so `ACCOUNT_MIN_ID + (iteration % ACCOUNT_COUNT)` gives
-  each iteration an account from the seeded range and wraps around when the
-  range is exhausted. The target rate is therefore kept for the full duration,
-  even if the run performs more deposits than there are accounts. Each
-  matrix run still gets its own slice (`ACCOUNT_SLICE`, default 5,000,000
-  accounts) so separate runs start from different ids.
-- **Slice size.** Any slice larger than zero works: the test no longer skips
-  requests when the range is used up, it just starts reusing accounts. A
-  larger slice only spreads the deposits over more ids.
+- **Account ids.** `exec.scenario.iterationInTest` is a global, zero-based
+  iteration counter, so deadline mode deposits to `ACCOUNT_MIN_ID + iteration`
+  and ids keep increasing until the deadline. Steady and ramp modes wrap with
+  `ACCOUNT_MIN_ID + (iteration % ACCOUNT_COUNT)` so the arrival rate is kept
+  for the full duration. Each matrix run still gets its own slice
+  (`ACCOUNT_SLICE`, default 5,000,000 accounts) so separate runs start from
+  different ids.
+- **Slice size.** Any slice larger than zero works: steady/ramp runs reuse
+  accounts once the range is used up. A larger slice only spreads the
+  deposits over more ids.
 - **Idempotency key.** `RUN_ID` is included in every key. Do not reuse a
   `RUN_ID`; a repeated key would return a replay instead of creating a
   deposit. The matrix generates a timestamped prefix automatically.
-- **15M accounts vs. 5M active accounts.** The table and its indexes are
-  large, so every lookup sees realistic index depth. Most deposits land in the
-  first few million ids during a short test; the long tail is not exercised.
-  That is intentional and does not change the hot-row contention behaviour.
-- **Idempotency table growth.** Every successful deposit leaves one row for
-  `IDEMPOTENCY_TTL` (default 24h). A full day at 174/s is 15M rows. Short
-  runs are fine; long soak tests will grow this table substantially.
-- **k6 capacity.** One k6 instance is enough for 174/s, but run it on a
-  separate machine from the service and DB for a production-like result. If
-  `dropped_iterations` is non-zero while the service is healthy, the load
-  generator or `VUS` is the limit.
+- **Account creation is idempotent.** `accounts.js` treats an existing account
+  (gRPC `OK` with a replay header, or `ALREADY_EXISTS`) as success and keeps
+  going. Re-running the seed test from the same id is safe.
+- **Idempotency table growth.** Every successful deposit and account creation
+  leaves one row for `IDEMPOTENCY_TTL` (default 24h). Short runs are fine;
+  long soak tests will grow this table substantially.
+- **k6 capacity.** One k6 instance is enough for the arrival-rate tests. For a
+  deadline/max-throughput run, raise `VUS` until `dropped_iterations` is
+  non-zero; if it stays non-zero while the service is healthy, the load
+  generator is the limit. Run k6 on a separate machine for a production-like
+  result.
 - **Percentile sample size.** p99.9 needs roughly 100,000+ requests to be
   meaningful. A 1-minute run at 6/s produces only ~360 requests, so its
   p99.9 is noisy. Use 30–60 minutes for the low rates if p99.9 matters.
@@ -246,7 +221,8 @@ A useful result table:
 
 | File                    | Purpose                                             |
 |-------------------------|-----------------------------------------------------|
-| `loadtest/deposit.js`   | k6 scenario, metrics, summary                       |
+| `loadtest/accounts.js`  | creates accounts 1,2,3,... through gRPC for 1m      |
+| `loadtest/deposit.js`   | deposit scenario (deadline/steady/ramp) + summary   |
 | `loadtest/run-matrix.sh`    | runs 6/12/174 (or ramp mode) with fresh slices   |
-| `loadtest/seed.env`         | account range seeded by migration 000005         |
+| `loadtest/seed.env`         | account id range used by both load tests         |
 | `loadtest/results/`         | JSON summaries written by `run-matrix.sh`        |

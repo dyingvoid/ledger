@@ -1,20 +1,24 @@
 // k6 load test for ledger FundsService.Deposit.
 //
 // One iteration = one Deposit RPC = one deposit.
-// Accounts are taken from a contiguous, pre-seeded ID range. The global
-// scenario iteration index walks that range and wraps around, so the run
-// keeps depositing at the target rate even after every account was used.
+// Accounts are taken from a contiguous, pre-seeded ID range starting at
+// ACCOUNT_MIN_ID (default 1) and increasing by one per iteration.
+//
+// Modes:
+//   deadline  constant VUs for DURATION; ids keep increasing until the deadline
+//   steady    constant arrival rate for DURATION
+//   ramp      ramping arrival rate until saturation
 //
 // Required env:
 //   ACCOUNT_MIN_ID      first account id of the seeded range (from seed.env)
-//   ACCOUNT_COUNT       number of accounts in the range (from seed.env)
 //
 // Common env:
-//   MODE=steady|ramp    default: steady
+//   MODE=deadline|steady|ramp    default: deadline
 //   RATE                steady arrival rate per second (default 6)
-//   DURATION            steady duration (default 1m)
+//   DURATION            deadline (default 1m)
 //   RAMP_STAGES         JSON stages for ramp mode
-//   VUS                 pre-allocated/max VUs (default: peak_rate * VU_SECONDS)
+//   VUS                 concurrent VUs (deadline default 50; steady/ramp
+//                       default peak_rate * VU_SECONDS)
 //   VU_SECONDS          assumed latency used to size VUs (default 0.5)
 //   TARGET              gRPC address (default 127.0.0.1:50051)
 //   REFLECT             use server reflection (default true)
@@ -38,7 +42,7 @@ import { check } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
 import exec from 'k6/execution';
 
-const MODE = (__ENV.MODE || 'steady').toLowerCase();
+const MODE = (__ENV.MODE || 'deadline').toLowerCase();
 const TARGET = __ENV.TARGET || '127.0.0.1:50051';
 const PLAINTEXT = (__ENV.PLAINTEXT || 'true') === 'true';
 const RPC_TIMEOUT = __ENV.RPC_TIMEOUT || '10s';
@@ -56,20 +60,23 @@ const DEFAULT_RAMP_STAGES =
   '{"target":174,"duration":"5m"},{"target":250,"duration":"5m"}]';
 const RAMP_STAGES = JSON.parse(__ENV.RAMP_STAGES || DEFAULT_RAMP_STAGES);
 
-const ACCOUNT_MIN_ID = Number(__ENV.ACCOUNT_MIN_ID || 4);
+const ACCOUNT_MIN_ID = Number(__ENV.ACCOUNT_MIN_ID || 1);
 const ACCOUNT_COUNT = Number(__ENV.ACCOUNT_COUNT || 15000000);
 
 const VU_SECONDS = Number(__ENV.VU_SECONDS || 0.5);
 const peakRate = MODE === 'ramp'
   ? Math.max(Number(__ENV.START_RATE || 1), ...RAMP_STAGES.map((s) => Number(s.target)))
   : RATE;
-const VUS = Number(__ENV.VUS || Math.max(20, Math.ceil(peakRate * VU_SECONDS)));
+const VUS = Number(__ENV.VUS || (MODE === 'deadline' ? 50 : Math.max(20, Math.ceil(peakRate * VU_SECONDS))));
 
 const MAX_FAIL_RATE = Number(__ENV.MAX_FAIL_RATE || 0.01);
 const P99_MS = Number(__ENV.P99_MS || 1000);
 
-if (!Number.isFinite(ACCOUNT_MIN_ID) || !Number.isFinite(ACCOUNT_COUNT) || ACCOUNT_COUNT <= 0) {
-  throw new Error('ACCOUNT_MIN_ID and ACCOUNT_COUNT must be set to the seeded account range');
+if (!Number.isFinite(ACCOUNT_MIN_ID) || ACCOUNT_MIN_ID <= 0) {
+  throw new Error('ACCOUNT_MIN_ID must be a positive number');
+}
+if (!Number.isFinite(ACCOUNT_COUNT) || ACCOUNT_COUNT <= 0) {
+  throw new Error('ACCOUNT_COUNT must be a positive number');
 }
 if (!Number.isFinite(VUS) || VUS <= 0) {
   throw new Error('VUS must be a positive number');
@@ -88,6 +95,14 @@ const scenario = MODE === 'ramp'
       maxVUs: VUS,
       gracefulStop: '30s',
       tags: { mode: 'ramp', run_id: RUN_ID },
+    }
+  : MODE === 'deadline'
+  ? {
+      executor: 'constant-vus',
+      vus: VUS,
+      duration: DURATION,
+      gracefulStop: '30s',
+      tags: { mode: 'deadline', run_id: RUN_ID },
     }
   : {
       executor: 'constant-arrival-rate',
@@ -185,9 +200,11 @@ function isOK(response) {
 export default function () {
   const seq = exec.scenario.iterationInTest; // 0-based, unique across the whole run
 
-  // Wrap around the seeded range so the target rate is kept for the whole
-  // duration even if the run needs more deposits than there are accounts.
-  const accountId = ACCOUNT_MIN_ID + (seq % ACCOUNT_COUNT);
+  // In deadline mode ids keep increasing until the deadline. In steady/ramp
+  // mode the range wraps so the arrival rate is kept for the whole run.
+  const accountId = MODE === 'deadline'
+    ? ACCOUNT_MIN_ID + seq
+    : ACCOUNT_MIN_ID + (seq % ACCOUNT_COUNT);
   const tags = {
     rate: String(MODE === 'ramp' ? 'ramp' : RATE),
     mode: MODE,
@@ -278,7 +295,7 @@ export function handleSummary(data) {
   lines.push(`mode         : ${MODE}`);
   lines.push(`target       : ${TARGET}`);
   lines.push(`run_id       : ${RUN_ID}`);
-  lines.push(`rate         : ${MODE === 'ramp' ? 'ramp' : `${RATE}/s`}`);
+  lines.push(`rate         : ${MODE === 'ramp' ? 'ramp' : MODE === 'deadline' ? `max (${VUS} VUs)` : `${RATE}/s`}`);
   lines.push(`duration     : ${MODE === 'ramp' ? JSON.stringify(RAMP_STAGES) : DURATION}`);
   lines.push(`VUs          : ${VUS}`);
   lines.push('');
