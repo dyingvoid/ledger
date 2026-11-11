@@ -34,7 +34,7 @@ func TestParseID(t *testing.T) {
 		}
 	})
 
-	t.Run("round-trips through big-endian storage", func(t *testing.T) {
+	t.Run("round-trips through bytes", func(t *testing.T) {
 		t.Parallel()
 
 		id, err := ParseID("123456789")
@@ -42,12 +42,8 @@ func TestParseID(t *testing.T) {
 			t.Fatalf("ParseID() error = %v", err)
 		}
 
-		stored := id.BigEndianBytes()
-		if got := IDFromBigEndianBytes(stored); got != id {
-			t.Fatalf("IDFromBigEndianBytes() = %s, want %s", got, id)
-		}
-		if bytes := id.Bytes(); IDFromBytes(bytes) != id {
-			t.Fatalf("IDFromBytes() = %s, want %s", IDFromBytes(bytes), id)
+		if got := IDFromBytes(id.Bytes()); got != id {
+			t.Fatalf("IDFromBytes() = %s, want %s", got, id)
 		}
 	})
 
@@ -71,6 +67,20 @@ func TestParseID(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestIDBytesAreBigEndian(t *testing.T) {
+	t.Parallel()
+
+	id, err := ParseID("256")
+	if err != nil {
+		t.Fatalf("ParseID() error = %v", err)
+	}
+
+	want := [idSize]byte{idSize - 2: 0x01, idSize - 1: 0x00}
+	if id.Bytes() != want {
+		t.Fatalf("Bytes() = %x, want %x", id.Bytes(), want)
+	}
 }
 
 func TestAccountTypeNormalBalance(t *testing.T) {

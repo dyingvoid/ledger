@@ -51,7 +51,7 @@ func testBankCashID(t *testing.T, ledger uint32) tigerbeetle_go.Uint128 {
 	if err != nil {
 		t.Fatalf("deterministicID() error = %v", err)
 	}
-	return tigerbeetle_go.BytesToUint128(id.Bytes())
+	return toTigerbeetleID(id)
 }
 
 func TestCreateDepositMapsTransfer(t *testing.T) {
@@ -86,13 +86,13 @@ func TestCreateDepositMapsTransfer(t *testing.T) {
 	}
 
 	transfer := client.transfers[0]
-	if transfer.ID != tigerbeetle_go.BytesToUint128(deposit.ID.Bytes()) {
+	if transfer.ID != toTigerbeetleID(deposit.ID) {
 		t.Fatalf("transfer ID = %s, want %s", transfer.ID, deposit.ID)
 	}
 	if transfer.DebitAccountID != testBankCashID(t, 1) {
 		t.Fatalf("debit account = %s, want bank cash account", transfer.DebitAccountID)
 	}
-	if transfer.CreditAccountID != tigerbeetle_go.BytesToUint128(deposit.AccountID.Bytes()) {
+	if transfer.CreditAccountID != toTigerbeetleID(deposit.AccountID) {
 		t.Fatalf("credit account = %s, want %s", transfer.CreditAccountID, deposit.AccountID)
 	}
 	if transfer.Amount != tigerbeetle_go.ToUint128(2500) {
@@ -159,11 +159,11 @@ func TestCreateDepositTreatsExistingTransferAsSuccess(t *testing.T) {
 	t.Parallel()
 
 	expected := tigerbeetle_go.Transfer{
-		ID:              tigerbeetle_go.BytesToUint128(testID(t, "99").Bytes()),
+		ID:              toTigerbeetleID(testID(t, "99")),
 		DebitAccountID:  testBankCashID(t, 1),
-		CreditAccountID: tigerbeetle_go.BytesToUint128(testID(t, "42").Bytes()),
+		CreditAccountID: toTigerbeetleID(testID(t, "42")),
 		Amount:          tigerbeetle_go.ToUint128(2500),
-		UserData128:     tigerbeetle_go.BytesToUint128(testID(t, "42").Bytes()),
+		UserData128:     toTigerbeetleID(testID(t, "42")),
 		Ledger:          1,
 		Code:            depositTransferCode,
 	}
@@ -195,7 +195,7 @@ func TestCreateDepositRejectsConflictingExistingTransfer(t *testing.T) {
 		}},
 		transferResults: []tigerbeetle_go.CreateTransferResult{{Status: tigerbeetle_go.TransferExists}},
 		lookupTransfers: []tigerbeetle_go.Transfer{{
-			ID:     tigerbeetle_go.BytesToUint128(testID(t, "99").Bytes()),
+			ID:     toTigerbeetleID(testID(t, "99")),
 			Amount: tigerbeetle_go.ToUint128(1),
 		}},
 	}

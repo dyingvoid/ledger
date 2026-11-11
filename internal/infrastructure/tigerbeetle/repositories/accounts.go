@@ -40,7 +40,7 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 	}
 
 	results, err := r.client.CreateAccounts([]tigerbeetle_go.Account{{
-		ID:         tigerbeetle_go.BytesToUint128(account.ID.Bytes()),
+		ID:         toTigerbeetleID(account.ID),
 		UserData64: uint64(account.UserID), //nolint:gosec // UserID is validated as positive before reaching the repository.
 		Ledger:     info.Ledger,
 		Code:       uint16(account.Type), //nolint:gosec // Account types are validated to be between 1000 and 5999.

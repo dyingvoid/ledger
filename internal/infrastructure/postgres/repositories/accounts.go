@@ -26,11 +26,8 @@ func NewAccounts(pool *pgxpool.Pool) *Accounts {
 	return &Accounts{pool: pool}
 }
 
-// Create inserts account metadata using the caller-provided 128-bit ID. The ID
-// is the idempotency key: an identical record is returned as-is, following
-// TigerBeetle's create-account semantics.
 func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.Account, error) {
-	id := account.ID.BigEndianBytes()
+	id := account.ID.Bytes()
 
 	created, err := scanAccount(r.pool.QueryRow(
 		ctx,
@@ -64,7 +61,7 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 }
 
 func (r *Accounts) Get(ctx context.Context, id domain.ID) (domain.Account, error) {
-	stored := id.BigEndianBytes()
+	stored := id.Bytes()
 
 	account, err := scanAccount(r.pool.QueryRow(
 		ctx,
@@ -113,7 +110,7 @@ func scanAccount(row rowScanner) (domain.Account, error) {
 		return domain.Account{}, fmt.Errorf("account info ID has %d bytes, want 16", len(stored))
 	}
 
-	account.ID = domain.IDFromBigEndianBytes([16]byte(stored))
+	account.ID = domain.IDFromBytes([16]byte(stored))
 	account.Type = domain.AccountType(typ)
 	account.Currency = domain.Currency(currency)
 	return account, nil

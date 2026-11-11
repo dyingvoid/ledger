@@ -141,7 +141,7 @@ func TestCreateAccountMapsFields(t *testing.T) {
 	}
 
 	sent := client.accounts[0]
-	if sent.ID != tigerbeetle_go.BytesToUint128(account.ID.Bytes()) {
+	if sent.ID != toTigerbeetleID(account.ID) {
 		t.Fatalf("ID = %s, want %s", sent.ID, account.ID)
 	}
 	if sent.UserData64 != 7 {

@@ -66,7 +66,7 @@ func (r *Deposits) clientAccountID(
 	deposit domain.Deposit,
 	ledger uint32,
 ) (tigerbeetle_go.Uint128, error) {
-	accountID := tigerbeetle_go.BytesToUint128(deposit.AccountID.Bytes())
+	accountID := toTigerbeetleID(deposit.AccountID)
 	accountsFound, err := r.client.LookupAccounts([]tigerbeetle_go.Uint128{accountID})
 	if err != nil {
 		return tigerbeetle_go.Uint128{}, fmt.Errorf("%w: %w", deposits.ErrLedgerUnavailable, err)
@@ -106,7 +106,7 @@ func buildDepositTransfer(
 	ledger uint32,
 ) tigerbeetle_go.Transfer {
 	return tigerbeetle_go.Transfer{
-		ID:              tigerbeetle_go.BytesToUint128(deposit.ID.Bytes()),
+		ID:              toTigerbeetleID(deposit.ID),
 		DebitAccountID:  bankCashAccountID,
 		CreditAccountID: clientAccountID,
 		Amount:          tigerbeetle_go.ToUint128(uint64(deposit.AmountMinor)), //nolint:gosec // AmountMinor is validated as positive.
@@ -192,7 +192,7 @@ func (r *Deposits) ensureBankCashAccount(ledger uint32) (tigerbeetle_go.Uint128,
 		return tigerbeetle_go.Uint128{}, fmt.Errorf("deriving bank cash account ID: %w", err)
 	}
 
-	accountID := tigerbeetle_go.BytesToUint128(externalID.Bytes())
+	accountID := toTigerbeetleID(externalID)
 	flags := tigerbeetle_go.AccountFlags{CreditsMustNotExceedDebits: true}
 	results, err := r.client.CreateAccounts([]tigerbeetle_go.Account{{
 		ID:     accountID,
