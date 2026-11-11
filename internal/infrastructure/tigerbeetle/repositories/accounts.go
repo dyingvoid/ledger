@@ -2,9 +2,7 @@ package repositories
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
 
 	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
 
@@ -26,15 +24,12 @@ func NewAccounts(client tigerbeetle_go.Client, currencies CurrencyLedgerReposito
 }
 
 func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.Account, error) {
-	if account.ExternalID.IsZero() {
-		return domain.Account{}, accounts.ErrExternalIDRequired
+	if account.ID.IsZero() {
+		return domain.Account{}, domain.ErrAccountIDRequired
 	}
 
 	info, err := r.currencies.Get(ctx, account.Currency)
 	if err != nil {
-		if errors.Is(err, accounts.ErrCurrencyNotFound) {
-			return domain.Account{}, fmt.Errorf("%w: %q", accounts.ErrCurrencyNotConfigured, account.Currency)
-		}
 		return domain.Account{}, fmt.Errorf("getting currency ledger: %w", err)
 	}
 
@@ -43,9 +38,8 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 		return domain.Account{}, err
 	}
 
-	externalID := account.ExternalID
 	results, err := r.client.CreateAccounts([]tigerbeetle_go.Account{{
-		ID:         tigerbeetle_go.BytesToUint128(externalID.Bytes()),
+		ID:         tigerbeetle_go.BytesToUint128(account.ID.Bytes()),
 		UserData64: uint64(account.UserID), //nolint:gosec // UserID is validated as positive before reaching the repository.
 		Ledger:     info.Ledger,
 		Code:       uint16(account.Type), //nolint:gosec // Account types are validated to be between 1000 and 5999.
@@ -62,11 +56,9 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 		)
 	}
 
-	result := results[0]
 	//nolint:exhaustive // Unknown statuses fall through to the generic error.
-	switch result.Status {
+	switch results[0].Status {
 	case tigerbeetle_go.AccountCreated, tigerbeetle_go.AccountExists:
-		account.CreatedAt = time.Unix(0, int64(result.Timestamp)).UTC() //nolint:gosec // TigerBeetle timestamps are nanoseconds well below int64 max.
 		return account, nil
 	case tigerbeetle_go.AccountExistsWithDifferentFlags,
 		tigerbeetle_go.AccountExistsWithDifferentUserData128,
@@ -74,12 +66,12 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 		tigerbeetle_go.AccountExistsWithDifferentUserData32,
 		tigerbeetle_go.AccountExistsWithDifferentLedger,
 		tigerbeetle_go.AccountExistsWithDifferentCode:
-		return domain.Account{}, fmt.Errorf("%w: %s", accounts.ErrAccountIDConflict, result.Status)
+		return domain.Account{}, fmt.Errorf("%w: %s", accounts.ErrAccountConflict, results[0].Status)
 	default:
 		return domain.Account{}, fmt.Errorf(
 			"creating tigerbeetle account %s: %s",
-			externalID,
-			result.Status,
+			account.ID,
+			results[0].Status,
 		)
 	}
 }
@@ -91,7 +83,6 @@ func accountFlags(account domain.Account) (uint16, error) {
 	}
 
 	flags := tigerbeetle_go.AccountFlags{}
-	// TODO: it will be better to derive this information from the account code 1000-5999/assets, liability, expense etc...
 	switch side {
 	case domain.Debit:
 		flags.CreditsMustNotExceedDebits = true

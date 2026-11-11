@@ -7,25 +7,26 @@ import (
 )
 
 var (
+	ErrAccountIDRequired   = errors.New("account ID is required")
 	ErrAccountNameRequired = errors.New("account name is required")
 	ErrAccountUserRequired = errors.New("account user ID is required")
 )
 
+// Account is the Postgres-side metadata for an account. Balances and movements
+// live in TigerBeetle and are never stored here.
 type Account struct {
-	ID          int64       `json:"id"`
-	ExternalID  ExternalID  `json:"external_id"`
+	ID          ID          `json:"id"`
 	UserID      int64       `json:"user_id"`
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	Type        AccountType `json:"type"`
 	Currency    Currency    `json:"currency"`
-	DebitMinor  int64       `json:"debit_minor"`
-	CreditMinor int64       `json:"credit_minor"`
 	DeletedAt   *time.Time  `json:"deleted_at,omitempty"`
 	CreatedAt   time.Time   `json:"created_at"`
 }
 
 func NewAccount(
+	id ID,
 	userID int64,
 	name string,
 	description string,
@@ -33,6 +34,7 @@ func NewAccount(
 	currency Currency,
 ) (Account, error) {
 	account := Account{
+		ID:          id,
 		UserID:      userID,
 		Name:        strings.TrimSpace(name),
 		Description: strings.TrimSpace(description),
@@ -50,6 +52,9 @@ func (a Account) NormalBalance() (BalanceSide, error) {
 }
 
 func (a Account) Validate() error {
+	if a.ID.IsZero() {
+		return ErrAccountIDRequired
+	}
 	if a.UserID <= 0 {
 		return ErrAccountUserRequired
 	}

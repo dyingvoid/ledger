@@ -10,51 +10,56 @@ import (
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
 	"github.com/dyingvoid/ledger/internal/domain"
-	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
 )
 
-type Currencies struct {
-	defaultExecutor postgres.Executor
+type CurrencyInfos struct {
+	pool *pgxpool.Pool
 }
 
-func NewCurrencies(pool *pgxpool.Pool) *Currencies {
-	return &Currencies{defaultExecutor: pool}
+func NewCurrencyInfos(pool *pgxpool.Pool) *CurrencyInfos {
+	return &CurrencyInfos{pool: pool}
 }
 
-func (r *Currencies) Exists(ctx context.Context, currency domain.Currency) (bool, error) {
-	var exists bool
-	err := r.executor(ctx).QueryRow(
+func (r *CurrencyInfos) Get(ctx context.Context, currency domain.Currency) (domain.CurrencyInfo, error) {
+	var (
+		info       domain.CurrencyInfo
+		ledger     uint32
+		assetScale int16
+	)
+
+	err := r.pool.QueryRow(
 		ctx,
-		`SELECT EXISTS (SELECT 1 FROM ledger.currency WHERE code = $1)`,
+		`SELECT name, ledger, asset_scale
+		 FROM ledger.currency_info
+		 WHERE code = $1`,
+		string(currency),
+	).Scan(
+		&info.Name,
+		&ledger,
+		&assetScale,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.CurrencyInfo{}, fmt.Errorf("%w: %q", accounts.ErrCurrencyNotFound, currency)
+	}
+	if err != nil {
+		return domain.CurrencyInfo{}, fmt.Errorf("getting currency info: %w", err)
+	}
+
+	info.Code = currency
+	info.Ledger = ledger
+	info.AssetScale = assetScale
+	return info, nil
+}
+
+func (r *CurrencyInfos) Exists(ctx context.Context, currency domain.Currency) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(
+		ctx,
+		`SELECT EXISTS (SELECT 1 FROM ledger.currency_info WHERE code = $1)`,
 		string(currency),
 	).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("checking currency: %w", err)
 	}
 	return exists, nil
-}
-
-func (r *Currencies) Get(ctx context.Context, currency domain.Currency) (domain.CurrencyInfo, error) {
-	info := domain.CurrencyInfo{Code: currency}
-	err := r.executor(ctx).QueryRow(
-		ctx,
-		`SELECT ledger, asset_scale
-		 FROM ledger.currency
-		 WHERE code = $1`,
-		string(currency),
-	).Scan(
-		&info.Ledger,
-		&info.AssetScale,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.CurrencyInfo{}, accounts.ErrCurrencyNotFound
-		}
-		return domain.CurrencyInfo{}, fmt.Errorf("getting currency: %w", err)
-	}
-	return info, nil
-}
-
-func (r *Currencies) executor(ctx context.Context) postgres.Executor {
-	return postgres.ExecutorFrom(ctx, r.defaultExecutor)
 }

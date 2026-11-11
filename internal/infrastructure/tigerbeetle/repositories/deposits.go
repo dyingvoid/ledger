@@ -4,14 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"strconv"
 	"sync"
 
 	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
 
-	"github.com/dyingvoid/ledger/internal/core/accounts"
 	"github.com/dyingvoid/ledger/internal/core/deposits"
 	"github.com/dyingvoid/ledger/internal/domain"
 )
@@ -32,10 +30,6 @@ func NewDeposits(client tigerbeetle_go.Client, currencies CurrencyLedgerReposito
 }
 
 func (r *Deposits) Create(ctx context.Context, deposit domain.Deposit) (domain.Deposit, error) {
-	if err := validateDeposit(deposit); err != nil {
-		return domain.Deposit{}, err
-	}
-
 	info, err := r.currencyInfo(ctx, deposit.Currency)
 	if err != nil {
 		return domain.Deposit{}, err
@@ -59,22 +53,9 @@ func (r *Deposits) Create(ctx context.Context, deposit domain.Deposit) (domain.D
 	))
 }
 
-func validateDeposit(deposit domain.Deposit) error {
-	if deposit.ExternalAccountID.IsZero() {
-		return fmt.Errorf("%w: external account ID is required", domain.ErrDepositAccountRequired)
-	}
-	if deposit.TransferID.IsZero() {
-		return deposits.ErrTransferIDRequired
-	}
-	return nil
-}
-
 func (r *Deposits) currencyInfo(ctx context.Context, currency domain.Currency) (domain.CurrencyInfo, error) {
 	info, err := r.currencies.Get(ctx, currency)
 	if err != nil {
-		if errors.Is(err, accounts.ErrCurrencyNotFound) {
-			return domain.CurrencyInfo{}, fmt.Errorf("%w: %q", accounts.ErrCurrencyNotConfigured, currency)
-		}
 		return domain.CurrencyInfo{}, fmt.Errorf("getting currency ledger: %w", err)
 	}
 	return info, nil
@@ -84,16 +65,16 @@ func (r *Deposits) clientAccountID(
 	deposit domain.Deposit,
 	ledger uint32,
 ) (tigerbeetle_go.Uint128, error) {
-	accountID := tigerbeetle_go.BytesToUint128(deposit.ExternalAccountID.Bytes())
+	accountID := tigerbeetle_go.BytesToUint128(deposit.AccountID.Bytes())
 	accountsFound, err := r.client.LookupAccounts([]tigerbeetle_go.Uint128{accountID})
 	if err != nil {
-		return tigerbeetle_go.Uint128{}, fmt.Errorf("%w: %w", deposits.ErrDepositStoreUnavailable, err)
+		return tigerbeetle_go.Uint128{}, fmt.Errorf("%w: %w", deposits.ErrLedgerUnavailable, err)
 	}
 	if len(accountsFound) == 0 {
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: %s",
 			domain.ErrDepositAccountNotFound,
-			deposit.ExternalAccountID,
+			deposit.AccountID,
 		)
 	}
 
@@ -102,7 +83,7 @@ func (r *Deposits) clientAccountID(
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: %s",
 			domain.ErrDepositAccountNotClient,
-			deposit.ExternalAccountID,
+			deposit.AccountID,
 		)
 	}
 	if account.Ledger != ledger {
@@ -124,7 +105,7 @@ func buildDepositTransfer(
 	ledger uint32,
 ) tigerbeetle_go.Transfer {
 	return tigerbeetle_go.Transfer{
-		ID:              tigerbeetle_go.BytesToUint128(deposit.TransferID.Bytes()),
+		ID:              tigerbeetle_go.BytesToUint128(deposit.ID.Bytes()),
 		DebitAccountID:  bankCashAccountID,
 		CreditAccountID: clientAccountID,
 		Amount:          tigerbeetle_go.ToUint128(uint64(deposit.AmountMinor)), //nolint:gosec // AmountMinor is validated as positive.
@@ -140,17 +121,17 @@ func (r *Deposits) submitTransfer(
 ) (domain.Deposit, error) {
 	results, err := r.client.CreateTransfers([]tigerbeetle_go.Transfer{transfer})
 	if err != nil {
-		return domain.Deposit{}, fmt.Errorf("%w: %w", deposits.ErrDepositStoreUnavailable, err)
+		return domain.Deposit{}, fmt.Errorf("%w: %w", deposits.ErrLedgerUnavailable, err)
 	}
 	if len(results) != 1 {
 		return domain.Deposit{}, fmt.Errorf(
 			"%w: expected 1 create result, got %d",
-			deposits.ErrDepositStoreUnavailable,
+			deposits.ErrLedgerUnavailable,
 			len(results),
 		)
 	}
 
-	//nolint:exhaustive // Unknown statuses fall through to the store-unavailable error.
+	//nolint:exhaustive // Unknown statuses fall through to the unavailable error.
 	switch results[0].Status {
 	case tigerbeetle_go.TransferCreated:
 		return deposit, nil
@@ -163,7 +144,7 @@ func (r *Deposits) submitTransfer(
 		return domain.Deposit{}, fmt.Errorf(
 			"%w: %s",
 			domain.ErrDepositAccountNotFound,
-			deposit.ExternalAccountID,
+			deposit.AccountID,
 		)
 	case tigerbeetle_go.TransferAccountsMustHaveTheSameLedger,
 		tigerbeetle_go.TransferTransferMustHaveTheSameLedgerAsAccounts:
@@ -179,12 +160,12 @@ func (r *Deposits) submitTransfer(
 		tigerbeetle_go.TransferExistsWithDifferentUserData32,
 		tigerbeetle_go.TransferExistsWithDifferentLedger,
 		tigerbeetle_go.TransferExistsWithDifferentCode:
-		return domain.Deposit{}, fmt.Errorf("%w: %s", deposits.ErrDepositConflict, results[0].Status)
+		return domain.Deposit{}, fmt.Errorf("%w: %s", domain.ErrDepositConflict, results[0].Status)
 	default:
 		return domain.Deposit{}, fmt.Errorf(
 			"%w: creating transfer %s: %s",
-			deposits.ErrDepositStoreUnavailable,
-			deposit.TransferID,
+			deposits.ErrLedgerUnavailable,
+			deposit.ID,
 			results[0].Status,
 		)
 	}
@@ -196,13 +177,13 @@ func (r *Deposits) ensureBankCashAccount(ledger uint32) (tigerbeetle_go.Uint128,
 		if !ok {
 			return tigerbeetle_go.Uint128{}, fmt.Errorf(
 				"%w: invalid bank cash account cache entry",
-				deposits.ErrDepositStoreUnavailable,
+				deposits.ErrLedgerUnavailable,
 			)
 		}
 		return accountID, nil
 	}
 
-	externalID, err := deterministicExternalID(
+	externalID, err := deterministicID(
 		"ledger.bank-cash.v1",
 		strconv.FormatUint(uint64(ledger), 10),
 	)
@@ -221,19 +202,19 @@ func (r *Deposits) ensureBankCashAccount(ledger uint32) (tigerbeetle_go.Uint128,
 	if err != nil {
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: creating bank cash account: %w",
-			deposits.ErrDepositStoreUnavailable,
+			deposits.ErrLedgerUnavailable,
 			err,
 		)
 	}
 	if len(results) != 1 {
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: expected 1 bank cash create result, got %d",
-			deposits.ErrDepositStoreUnavailable,
+			deposits.ErrLedgerUnavailable,
 			len(results),
 		)
 	}
 
-	//nolint:exhaustive // Unknown statuses fall through to the store-unavailable error.
+	//nolint:exhaustive // Unknown statuses fall through to the unavailable error.
 	switch results[0].Status {
 	case tigerbeetle_go.AccountCreated, tigerbeetle_go.AccountExists:
 		r.bankCashIDCache.Store(ledger, accountID)
@@ -246,14 +227,14 @@ func (r *Deposits) ensureBankCashAccount(ledger uint32) (tigerbeetle_go.Uint128,
 		tigerbeetle_go.AccountExistsWithDifferentCode:
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: bank cash account for ledger %d: %s",
-			deposits.ErrDepositConflict,
+			domain.ErrDepositConflict,
 			ledger,
 			results[0].Status,
 		)
 	default:
 		return tigerbeetle_go.Uint128{}, fmt.Errorf(
 			"%w: creating bank cash account for ledger %d: %s",
-			deposits.ErrDepositStoreUnavailable,
+			deposits.ErrLedgerUnavailable,
 			ledger,
 			results[0].Status,
 		)
@@ -263,13 +244,13 @@ func (r *Deposits) ensureBankCashAccount(ledger uint32) (tigerbeetle_go.Uint128,
 func (r *Deposits) verifyExistingTransfer(expected tigerbeetle_go.Transfer) error {
 	existing, err := r.client.LookupTransfers([]tigerbeetle_go.Uint128{expected.ID})
 	if err != nil {
-		return fmt.Errorf("%w: %w", deposits.ErrDepositStoreUnavailable, err)
+		return fmt.Errorf("%w: %w", deposits.ErrLedgerUnavailable, err)
 	}
 	if len(existing) != 1 {
-		return fmt.Errorf("%w: existing transfer %s not found", deposits.ErrDepositConflict, expected.ID)
+		return fmt.Errorf("%w: existing transfer %s not found", domain.ErrDepositConflict, expected.ID)
 	}
 	if !sameTransfer(existing[0], expected) {
-		return fmt.Errorf("%w: transfer %s", deposits.ErrDepositConflict, expected.ID)
+		return fmt.Errorf("%w: transfer %s", domain.ErrDepositConflict, expected.ID)
 	}
 	return nil
 }
@@ -285,7 +266,7 @@ func sameTransfer(actual tigerbeetle_go.Transfer, expected tigerbeetle_go.Transf
 		actual.Flags == expected.Flags
 }
 
-func deterministicExternalID(namespace string, value string) (domain.ExternalID, error) {
+func deterministicID(namespace string, value string) (domain.ID, error) {
 	digest := sha256.Sum256([]byte(namespace + ":" + value))
-	return domain.ParseExternalID("0x" + hex.EncodeToString(digest[:16]))
+	return domain.ParseID("0x" + hex.EncodeToString(digest[:16]))
 }

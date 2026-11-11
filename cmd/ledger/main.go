@@ -16,7 +16,6 @@ import (
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
 	"github.com/dyingvoid/ledger/internal/core/deposits"
-	"github.com/dyingvoid/ledger/internal/core/idempotency"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres"
 	"github.com/dyingvoid/ledger/internal/infrastructure/postgres/repositories"
 	"github.com/dyingvoid/ledger/internal/infrastructure/tigerbeetle"
@@ -79,10 +78,7 @@ func run() error {
 	}
 	defer tbClient.Close()
 
-	services, err := newServices(pool, tbClient)
-	if err != nil {
-		return fmt.Errorf("building services: %w", err)
-	}
+	services := newServices(pool, tbClient)
 
 	grpcCfg, err := transportgrpc.LoadConfig()
 	if err != nil {
@@ -95,7 +91,6 @@ func run() error {
 		log,
 		services.accounts,
 		services.deposits,
-		services.idempotencyService,
 	)
 	if err != nil {
 		return fmt.Errorf("creating grpc server: %w", err)
@@ -105,44 +100,21 @@ func run() error {
 }
 
 type services struct {
-	accounts           *accounts.Service
-	deposits           *deposits.Service
-	idempotencyService *idempotency.Service
+	accounts *accounts.Service
+	deposits *deposits.Service
 }
 
-const (
-	useTigerBeetleAccounts = true
-	useTigerBeetleDeposits = true
-)
+func newServices(pool *pgxpool.Pool, tbClient tigerbeetle_go.Client) *services {
+	currencyInfos := repositories.NewCurrencyInfos(pool)
+	accountInfos := repositories.NewAccounts(pool)
 
-func newServices(pool *pgxpool.Pool, tbClient tigerbeetle_go.Client) (*services, error) {
-	idempotencyCfg, err := idempotency.LoadConfig()
-	if err != nil {
-		return nil, fmt.Errorf("loading idempotency config: %w", err)
-	}
-
-	accountTypes := repositories.NewAccounts(pool)
-	currencies := repositories.NewCurrencies(pool)
-	depositRepository := repositories.NewDeposits(pool)
-	idempotencyStore := repositories.NewIdempotency(pool)
-	unitOfWork := postgres.NewUnitOfWork(pool)
-	idempotencyService := idempotency.NewService(idempotencyStore, unitOfWork, idempotencyCfg)
-
-	var accountWriter accounts.AccountRepository = accountTypes
-	if useTigerBeetleAccounts {
-		accountWriter = tbrepositories.NewAccounts(tbClient, currencies)
-	}
-
-	var depositWriter deposits.Repository = depositRepository
-	if useTigerBeetleDeposits {
-		depositWriter = tbrepositories.NewDeposits(tbClient, currencies)
-	}
+	accountLedger := tbrepositories.NewAccounts(tbClient, currencyInfos)
+	depositLedger := tbrepositories.NewDeposits(tbClient, currencyInfos)
 
 	return &services{
-		accounts:           accounts.NewService(accountWriter, accountTypes, currencies),
-		deposits:           deposits.NewService(depositWriter),
-		idempotencyService: idempotencyService,
-	}, nil
+		accounts: accounts.NewService(accountInfos, accountLedger),
+		deposits: deposits.NewService(depositLedger),
+	}
 }
 
 func serve(ctx context.Context, server *transportgrpc.Server, log *slog.Logger) error {

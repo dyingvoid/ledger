@@ -5,6 +5,72 @@ import (
 	"testing"
 )
 
+func TestParseID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("accepts decimal and hexadecimal values", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			value string
+			want  string
+		}{
+			{value: "1", want: "1"},
+			{value: "42", want: "42"},
+			{value: "0xff", want: "255"},
+			{value: "340282366920938463463374607431768211454", want: "340282366920938463463374607431768211454"},
+		}
+
+		for _, test := range tests {
+			id, err := ParseID(test.value)
+			if err != nil {
+				t.Fatalf("ParseID(%q) error = %v", test.value, err)
+			}
+			if id.String() != test.want {
+				t.Fatalf("ParseID(%q) = %s, want %s", test.value, id, test.want)
+			}
+		}
+	})
+
+	t.Run("round-trips through big-endian storage", func(t *testing.T) {
+		t.Parallel()
+
+		id, err := ParseID("123456789")
+		if err != nil {
+			t.Fatalf("ParseID() error = %v", err)
+		}
+
+		stored := id.BigEndianBytes()
+		if got := IDFromBigEndianBytes(stored); got != id {
+			t.Fatalf("IDFromBigEndianBytes() = %s, want %s", got, id)
+		}
+		if bytes := id.Bytes(); IDFromBytes(bytes) != id {
+			t.Fatalf("IDFromBytes() = %s, want %s", IDFromBytes(bytes), id)
+		}
+	})
+
+	t.Run("rejects invalid values", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []string{
+			"",
+			"   ",
+			"abc",
+			"-1",
+			"0",
+			"0x0",
+			"340282366920938463463374607431768211456",
+			"340282366920938463463374607431768211455",
+		}
+
+		for _, value := range tests {
+			if _, err := ParseID(value); !errors.Is(err, ErrIDInvalid) {
+				t.Fatalf("ParseID(%q) error = %v, want %v", value, err, ErrIDInvalid)
+			}
+		}
+	})
+}
+
 func TestAccountTypeNormalBalance(t *testing.T) {
 	t.Parallel()
 
@@ -68,7 +134,7 @@ func TestNewAccount(t *testing.T) {
 	t.Run("trims name and description", func(t *testing.T) {
 		t.Parallel()
 
-		account, err := NewAccount(7, "  Daily  ", "  Spending  ", 2100, "USD")
+		account, err := NewAccount(testID(t, "1"), 7, "  Daily  ", "  Spending  ", 2100, "USD")
 		if err != nil {
 			t.Fatalf("NewAccount() error = %v", err)
 		}
@@ -80,10 +146,19 @@ func TestNewAccount(t *testing.T) {
 		}
 	})
 
+	t.Run("rejects missing ID", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := NewAccount(ID{}, 7, "Daily", "", 2100, "USD")
+		if !errors.Is(err, ErrAccountIDRequired) {
+			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountIDRequired)
+		}
+	})
+
 	t.Run("rejects missing user", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewAccount(0, "Daily", "", 2100, "USD")
+		_, err := NewAccount(testID(t, "1"), 0, "Daily", "", 2100, "USD")
 		if !errors.Is(err, ErrAccountUserRequired) {
 			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountUserRequired)
 		}
@@ -93,7 +168,7 @@ func TestNewAccount(t *testing.T) {
 		t.Parallel()
 
 		for _, accountType := range []AccountType{999, 6000} {
-			_, err := NewAccount(7, "Daily", "", accountType, "USD")
+			_, err := NewAccount(testID(t, "1"), 7, "Daily", "", accountType, "USD")
 			if !errors.Is(err, ErrAccountTypeInvalid) {
 				t.Fatalf("NewAccount(%d) error = %v, want %v", accountType, err, ErrAccountTypeInvalid)
 			}
@@ -103,7 +178,7 @@ func TestNewAccount(t *testing.T) {
 	t.Run("rejects empty currency", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewAccount(7, "Daily", "", 2100, "  ")
+		_, err := NewAccount(testID(t, "1"), 7, "Daily", "", 2100, "  ")
 		if !errors.Is(err, ErrAccountCurrencyRequired) {
 			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountCurrencyRequired)
 		}
@@ -112,9 +187,19 @@ func TestNewAccount(t *testing.T) {
 	t.Run("rejects empty name", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewAccount(7, "  ", "", 2100, "USD")
+		_, err := NewAccount(testID(t, "1"), 7, "  ", "", 2100, "USD")
 		if !errors.Is(err, ErrAccountNameRequired) {
 			t.Fatalf("NewAccount() error = %v, want %v", err, ErrAccountNameRequired)
 		}
 	})
+}
+
+func testID(t *testing.T, value string) ID {
+	t.Helper()
+
+	id, err := ParseID(value)
+	if err != nil {
+		t.Fatalf("ParseID(%q) error = %v", value, err)
+	}
+	return id
 }

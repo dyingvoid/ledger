@@ -6,7 +6,7 @@ MIGRATE_LOCK_TIMEOUT ?= 5
 RATE ?= 6
 DURATION ?= 1m
 
-.PHONY: run build test test-integration fmt vet lint lint-fix tidy \
+.PHONY: run build test fmt vet lint lint-fix tidy \
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
 	tigerbeetle-up tigerbeetle-down tigerbeetle-logs \
@@ -22,9 +22,6 @@ build:
 
 test:
 	@go test -race ./...
-
-test-integration:
-	@go test -race -tags integration ./integration/...
 
 fmt:
 	@gofmt -s -w .

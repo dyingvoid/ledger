@@ -12,8 +12,12 @@ export default function () {
   client.connect('127.0.0.1:55051', { plaintext: true, reflect: true });
   const response = client.invoke(
     'ledger.funds.v1.FundsService/Deposit',
-    { account_id: 900000, amount_minor: 100, currency: 'USD' },
-    { metadata: { 'x-idempotency-key': 'probe-' + Date.now() + ':900000' } }
+    {
+      id: '0x' + Date.now().toString(16).padStart(12, '0') + '000000000000000001',
+      account_id: '900000',
+      amount_minor: 100,
+      currency: 'USD',
+    }
   );
   const s = response.status;
   console.log('STATUS=', s, 'TYPE=', typeof s, 'STRING=', String(s), 'NUMBER=', Number(s));

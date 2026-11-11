@@ -1,13 +1,12 @@
-// k6 load test for ledger AccountService.CreateAccount.
+// k6 load test for ledger AccountService.
 //
-// One iteration = one CreateAccount RPC = one account.
+// One iteration = one CreateAccountInfo RPC followed by OpenLedgerAccount.
 // Account ids start at ACCOUNT_MIN_ID (default 1) and increase by one for
 // every iteration of the run. The scenario runs for DURATION (default 1m)
 // and keeps creating accounts until the deadline.
 //
-// Account creation is idempotent: an account that already exists is treated
-// as success. The idempotency key ends with the account id, so the server
-// derives the TigerBeetle external id from it.
+// Account creation is idempotent: the account id is also the idempotency key.
+// Re-running the test for the same id is safe.
 //
 // Common env:
 //   DURATION            deadline (default 1m)
@@ -124,14 +123,6 @@ function connect() {
   connected = true;
 }
 
-function headerHas(headers, name, value) {
-  if (!headers) return false;
-  const raw = headers[name];
-  if (raw === undefined) return false;
-  if (Array.isArray(raw)) return raw.includes(value);
-  return String(raw) === value;
-}
-
 function statusCode(response) {
   if (!response) return -1;
   const code = Number(response.status);
@@ -157,11 +148,13 @@ export default function () {
 
   const started = Date.now();
   accountRequests.add(1, tags);
+  const accountID = String(accountId);
   let response;
   try {
     response = client.invoke(
-      'ledger.accounts.v1.AccountService/CreateAccount',
+      'ledger.accounts.v1.AccountService/CreateAccountInfo',
       {
+        id: accountID,
         user_id: USER_ID,
         name: `deposit-seed-${accountId}`,
         description: 'loadtest account seed',
@@ -169,15 +162,23 @@ export default function () {
         currency: CURRENCY,
       },
       {
-        metadata: {
-          // The last segment is the external account ID required by the server.
-          'x-idempotency-key': `lt-accounts-${RUN_ID}-${seq}:${accountId}`,
-        },
         tags,
         timeout: RPC_TIMEOUT,
         discardResponseMessage: true,
       }
     );
+
+    if (isOK(response)) {
+      response = client.invoke(
+        'ledger.accounts.v1.AccountService/OpenLedgerAccount',
+        { id: accountID },
+        {
+          tags,
+          timeout: RPC_TIMEOUT,
+          discardResponseMessage: true,
+        }
+      );
+    }
   } catch (err) {
     connected = false;
     accountFailedDuration.add(Date.now() - started, tags);
@@ -192,9 +193,6 @@ export default function () {
   if (isOK(response)) {
     accountOK.add(1, tags);
     accountOKDuration.add(elapsed, tags);
-    if (headerHas(response.headers, 'x-idempotent-replayed', 'true')) {
-      accountExists.add(1, tags);
-    }
   } else if (code === 6) {
     // ALREADY_EXISTS: keep going, an existing account is fine.
     accountExists.add(1, tags);

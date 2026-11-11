@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
 
@@ -103,17 +102,17 @@ func (f *fakeCurrencies) Get(_ context.Context, _ domain.Currency) (domain.Curre
 func testAccount(t *testing.T, accountType domain.AccountType) domain.Account {
 	t.Helper()
 
-	externalID, err := domain.ParseExternalID("123456789")
+	id, err := domain.ParseID("123456789")
 	if err != nil {
-		t.Fatalf("ParseExternalID() error = %v", err)
+		t.Fatalf("ParseID() error = %v", err)
 	}
 
 	return domain.Account{
-		ExternalID: externalID,
-		UserID:     7,
-		Name:       "Daily",
-		Type:       accountType,
-		Currency:   testUSD,
+		ID:       id,
+		UserID:   7,
+		Name:     "Daily",
+		Type:     accountType,
+		Currency: testUSD,
 	}
 }
 
@@ -141,11 +140,8 @@ func TestCreateAccountMapsFields(t *testing.T) {
 	}
 
 	sent := client.accounts[0]
-	if sent.ID != tigerbeetle_go.BytesToUint128(account.ExternalID.Bytes()) {
-		t.Fatalf("ID = %s, want %s", sent.ID, account.ExternalID)
-	}
-	if sent.ID != tigerbeetle_go.BigIntToUint128(account.ExternalID.BigInt()) {
-		t.Fatalf("ID = %s, want big-int encoding %s", sent.ID, account.ExternalID)
+	if sent.ID != tigerbeetle_go.BytesToUint128(account.ID.Bytes()) {
+		t.Fatalf("ID = %s, want %s", sent.ID, account.ID)
 	}
 	if sent.UserData64 != 7 {
 		t.Fatalf("UserData64 = %d, want 7", sent.UserData64)
@@ -162,11 +158,8 @@ func TestCreateAccountMapsFields(t *testing.T) {
 	if sent.AccountFlags().DebitsMustNotExceedCredits {
 		t.Fatalf("DebitsMustNotExceedCredits = true, want false")
 	}
-	if !created.CreatedAt.Equal(time.Unix(0, 1_000_000_000).UTC()) {
-		t.Fatalf("CreatedAt = %s, want %s", created.CreatedAt, time.Unix(0, 1_000_000_000).UTC())
-	}
-	if created.ID != 0 {
-		t.Fatalf("ID = %d, want 0", created.ID)
+	if created.ID != account.ID {
+		t.Fatalf("ID = %s, want %s", created.ID, account.ID)
 	}
 }
 
@@ -201,12 +194,12 @@ func TestCreateAccountResults(t *testing.T) {
 	}{
 		{name: "created", status: tigerbeetle_go.AccountCreated},
 		{name: "exists", status: tigerbeetle_go.AccountExists},
-		{name: "different flags", status: tigerbeetle_go.AccountExistsWithDifferentFlags, wantErr: accounts.ErrAccountIDConflict},
-		{name: "different user data 128", status: tigerbeetle_go.AccountExistsWithDifferentUserData128, wantErr: accounts.ErrAccountIDConflict},
-		{name: "different user data 64", status: tigerbeetle_go.AccountExistsWithDifferentUserData64, wantErr: accounts.ErrAccountIDConflict},
-		{name: "different user data 32", status: tigerbeetle_go.AccountExistsWithDifferentUserData32, wantErr: accounts.ErrAccountIDConflict},
-		{name: "different ledger", status: tigerbeetle_go.AccountExistsWithDifferentLedger, wantErr: accounts.ErrAccountIDConflict},
-		{name: "different code", status: tigerbeetle_go.AccountExistsWithDifferentCode, wantErr: accounts.ErrAccountIDConflict},
+		{name: "different flags", status: tigerbeetle_go.AccountExistsWithDifferentFlags, wantErr: accounts.ErrAccountConflict},
+		{name: "different user data 128", status: tigerbeetle_go.AccountExistsWithDifferentUserData128, wantErr: accounts.ErrAccountConflict},
+		{name: "different user data 64", status: tigerbeetle_go.AccountExistsWithDifferentUserData64, wantErr: accounts.ErrAccountConflict},
+		{name: "different user data 32", status: tigerbeetle_go.AccountExistsWithDifferentUserData32, wantErr: accounts.ErrAccountConflict},
+		{name: "different ledger", status: tigerbeetle_go.AccountExistsWithDifferentLedger, wantErr: accounts.ErrAccountConflict},
+		{name: "different code", status: tigerbeetle_go.AccountExistsWithDifferentCode, wantErr: accounts.ErrAccountConflict},
 	}
 
 	for _, test := range tests {
@@ -256,33 +249,33 @@ func TestCreateAccountClientError(t *testing.T) {
 	}
 }
 
-func TestCreateAccountRequiresExternalID(t *testing.T) {
+func TestCreateAccountRequiresID(t *testing.T) {
 	t.Parallel()
 
 	client := &fakeClient{}
 	repository := NewAccounts(client, &fakeCurrencies{info: domain.CurrencyInfo{Ledger: 1}})
 
 	account := testAccount(t, 1000)
-	account.ExternalID = domain.ExternalID{}
+	account.ID = domain.ID{}
 
 	_, err := repository.Create(context.Background(), account)
-	if !errors.Is(err, accounts.ErrExternalIDRequired) {
-		t.Fatalf("Create() error = %v, want %v", err, accounts.ErrExternalIDRequired)
+	if !errors.Is(err, domain.ErrAccountIDRequired) {
+		t.Fatalf("Create() error = %v, want %v", err, domain.ErrAccountIDRequired)
 	}
 	if client.calls != 0 {
 		t.Fatalf("CreateAccounts() calls = %d, want 0", client.calls)
 	}
 }
 
-func TestCreateAccountCurrencyNotConfigured(t *testing.T) {
+func TestCreateAccountCurrencyNotFound(t *testing.T) {
 	t.Parallel()
 
 	client := &fakeClient{}
 	repository := NewAccounts(client, &fakeCurrencies{err: accounts.ErrCurrencyNotFound})
 
 	_, err := repository.Create(context.Background(), testAccount(t, 1000))
-	if !errors.Is(err, accounts.ErrCurrencyNotConfigured) {
-		t.Fatalf("Create() error = %v, want %v", err, accounts.ErrCurrencyNotConfigured)
+	if !errors.Is(err, accounts.ErrCurrencyNotFound) {
+		t.Fatalf("Create() error = %v, want %v", err, accounts.ErrCurrencyNotFound)
 	}
 	if client.calls != 0 {
 		t.Fatalf("CreateAccounts() calls = %d, want 0", client.calls)

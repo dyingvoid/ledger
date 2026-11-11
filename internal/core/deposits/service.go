@@ -10,9 +10,7 @@ import (
 )
 
 var (
-	ErrDepositStoreUnavailable = errors.New("deposit store unavailable")
-	ErrDepositConflict         = errors.New("deposit conflicts with an existing transfer")
-	ErrTransferIDRequired      = errors.New("deposit transfer ID is required")
+	ErrLedgerUnavailable = errors.New("ledger unavailable")
 )
 
 type Repository interface {
@@ -27,26 +25,25 @@ func NewService(deposits Repository) *Service {
 	return &Service{deposits: deposits}
 }
 
-type AddDepositParams struct {
-	AccountID         int64
-	ExternalAccountID domain.ExternalID
-	TransferID        domain.ExternalID
-	AmountMinor       int64
-	Currency          domain.Currency
+type DepositParams struct {
+	ID          domain.ID
+	AccountID   domain.ID
+	AmountMinor int64
+	Currency    domain.Currency
 }
 
-func (s *Service) AddDeposit(ctx context.Context, params AddDepositParams) (domain.Deposit, error) {
+// Deposit moves funds into a client account. The deposit ID is the
+// TigerBeetle transfer ID and therefore its idempotency key.
+func (s *Service) Deposit(ctx context.Context, params DepositParams) (domain.Deposit, error) {
 	deposit, err := domain.NewDeposit(
+		params.ID,
 		params.AccountID,
-		params.ExternalAccountID,
 		params.AmountMinor,
 		params.Currency,
 	)
 	if err != nil {
 		return domain.Deposit{}, fmt.Errorf("validating deposit: %w", err)
 	}
-
-	deposit.TransferID = params.TransferID
 
 	created, err := s.deposits.Create(ctx, deposit)
 	if err != nil {
@@ -55,11 +52,9 @@ func (s *Service) AddDeposit(ctx context.Context, params AddDepositParams) (doma
 
 	logger.FromContext(ctx).InfoContext(
 		ctx,
-		"deposit added",
+		"deposit created",
+		"transfer_id", created.ID,
 		"account_id", created.AccountID,
-		"external_account_id", created.ExternalAccountID.String(),
-		"journal_entry_id", created.JournalEntryID,
-		"transfer_id", created.TransferID.String(),
 		"amount_minor", created.AmountMinor,
 		"currency", created.Currency,
 	)

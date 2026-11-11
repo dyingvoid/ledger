@@ -23,9 +23,10 @@ const (
 
 type DepositRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	AmountMinor   int64                  `protobuf:"varint,2,opt,name=amount_minor,json=amountMinor,proto3" json:"amount_minor,omitempty"`
-	Currency      string                 `protobuf:"bytes,3,opt,name=currency,proto3" json:"currency,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	AmountMinor   int64                  `protobuf:"varint,3,opt,name=amount_minor,json=amountMinor,proto3" json:"amount_minor,omitempty"`
+	Currency      string                 `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -60,11 +61,18 @@ func (*DepositRequest) Descriptor() ([]byte, []int) {
 	return file_ledger_funds_v1_funds_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *DepositRequest) GetAccountId() int64 {
+func (x *DepositRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *DepositRequest) GetAccountId() string {
 	if x != nil {
 		return x.AccountId
 	}
-	return 0
+	return ""
 }
 
 func (x *DepositRequest) GetAmountMinor() int64 {
@@ -82,12 +90,10 @@ func (x *DepositRequest) GetCurrency() string {
 }
 
 type DepositResponse struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	JournalEntryId int64                  `protobuf:"varint,1,opt,name=journal_entry_id,json=journalEntryId,proto3" json:"journal_entry_id,omitempty"`
-	Replayed       bool                   `protobuf:"varint,2,opt,name=replayed,proto3" json:"replayed,omitempty"`
-	TransferId     string                 `protobuf:"bytes,3,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TransferId    string                 `protobuf:"bytes,1,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DepositResponse) Reset() {
@@ -120,20 +126,6 @@ func (*DepositResponse) Descriptor() ([]byte, []int) {
 	return file_ledger_funds_v1_funds_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *DepositResponse) GetJournalEntryId() int64 {
-	if x != nil {
-		return x.JournalEntryId
-	}
-	return 0
-}
-
-func (x *DepositResponse) GetReplayed() bool {
-	if x != nil {
-		return x.Replayed
-	}
-	return false
-}
-
 func (x *DepositResponse) GetTransferId() string {
 	if x != nil {
 		return x.TransferId
@@ -145,16 +137,15 @@ var File_ledger_funds_v1_funds_proto protoreflect.FileDescriptor
 
 const file_ledger_funds_v1_funds_proto_rawDesc = "" +
 	"\n" +
-	"\x1bledger/funds/v1/funds.proto\x12\x0fledger.funds.v1\"n\n" +
-	"\x0eDepositRequest\x12\x1d\n" +
+	"\x1bledger/funds/v1/funds.proto\x12\x0fledger.funds.v1\"~\n" +
+	"\x0eDepositRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\x03R\taccountId\x12!\n" +
-	"\famount_minor\x18\x02 \x01(\x03R\vamountMinor\x12\x1a\n" +
-	"\bcurrency\x18\x03 \x01(\tR\bcurrency\"x\n" +
-	"\x0fDepositResponse\x12(\n" +
-	"\x10journal_entry_id\x18\x01 \x01(\x03R\x0ejournalEntryId\x12\x1a\n" +
-	"\breplayed\x18\x02 \x01(\bR\breplayed\x12\x1f\n" +
-	"\vtransfer_id\x18\x03 \x01(\tR\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12!\n" +
+	"\famount_minor\x18\x03 \x01(\x03R\vamountMinor\x12\x1a\n" +
+	"\bcurrency\x18\x04 \x01(\tR\bcurrency\"2\n" +
+	"\x0fDepositResponse\x12\x1f\n" +
+	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId2\\\n" +
 	"\fFundsService\x12L\n" +
 	"\aDeposit\x12\x1f.ledger.funds.v1.DepositRequest\x1a .ledger.funds.v1.DepositResponseB?Z=github.com/dyingvoid/ledger/pkg/proto/ledger/funds/v1;fundsv1b\x06proto3"

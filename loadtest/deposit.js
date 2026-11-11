@@ -148,7 +148,6 @@ const CODE_NAMES = {
 const depositRequests = new Counter('deposit_requests');
 const depositOK = new Counter('deposit_ok');
 const depositFailed = new Counter('deposit_failed');
-const depositReplayed = new Counter('deposit_replayed');
 const depositExceptions = new Counter('deposit_exceptions');
 const depositOKDuration = new Trend('deposit_ok_duration', true);
 const depositFailedDuration = new Trend('deposit_failed_duration', true);
@@ -174,14 +173,6 @@ function connect() {
     client.connect(TARGET, { plaintext: PLAINTEXT, timeout: '10s' });
   }
   connected = true;
-}
-
-function headerHas(headers, name, value) {
-  if (!headers) return false;
-  const raw = headers[name];
-  if (raw === undefined) return false;
-  if (Array.isArray(raw)) return raw.includes(value);
-  return String(raw) === value;
 }
 
 // k6 v1 exposes response.status as a number; k6 v2 exposes a Status object
@@ -217,21 +208,20 @@ export default function () {
 
   const started = Date.now();
   depositRequests.add(1, tags);
+  const transferId = '0x' +
+    Date.now().toString(16).padStart(12, '0') +
+    seq.toString(16).padStart(20, '0');
   let response;
   try {
     response = client.invoke(
       'ledger.funds.v1.FundsService/Deposit',
       {
-        account_id: accountId,
+        id: transferId,
+        account_id: String(accountId),
         amount_minor: AMOUNT_MINOR,
         currency: CURRENCY,
       },
       {
-        metadata: {
-          // The last segment is the external account ID required by the server.
-          // A unique key per request makes this an actual deposit, not a replay.
-          'x-idempotency-key': `lt-${RUN_ID}-${seq}:${accountId}`,
-        },
         tags,
         timeout: RPC_TIMEOUT,
         discardResponseMessage: true,
@@ -252,9 +242,6 @@ export default function () {
   if (isOK(response)) {
     depositOK.add(1, tags);
     depositOKDuration.add(elapsed, tags);
-    if (headerHas(response.headers, 'x-idempotent-replayed', 'true')) {
-      depositReplayed.add(1, tags);
-    }
   } else {
     const code = statusCode(response);
     depositFailed.add(1, { ...tags, code: String(code) });
@@ -285,7 +272,6 @@ export function handleSummary(data) {
   const ok = (m.deposit_ok && m.deposit_ok.values.count) || 0;
   const failed = (m.deposit_failed && m.deposit_failed.values.count) || 0;
   const exceptions = (m.deposit_exceptions && m.deposit_exceptions.values.count) || 0;
-  const replayed = (m.deposit_replayed && m.deposit_replayed.values.count) || 0;
   const dropped = (m.dropped_iterations && m.dropped_iterations.values.count) || 0;
   const latency = (m.grpc_req_duration && m.grpc_req_duration.values) || {};
 
@@ -311,7 +297,6 @@ export function handleSummary(data) {
       lines.push(`  code ${code} ${CODE_NAMES[code]}: ${count}`);
     }
   }
-  lines.push(`replayed     : ${replayed}`);
   lines.push(`dropped iter : ${dropped}${dropped > 0 ? '  <-- k6 could not start every scheduled iteration' : ''}`);
   lines.push('');
   if (latency['p(50)'] !== undefined) {
