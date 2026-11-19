@@ -1,37 +1,33 @@
 package domain
 
 import (
-	"errors"
 	"strings"
 	"time"
-)
 
-var (
-	ErrAccountNameRequired = errors.New("account name is required")
-	ErrAccountUserRequired = errors.New("account user ID is required")
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 )
 
 type Account struct {
-	ID          int64       `json:"id"`
+	ID          ID          `json:"id"`
 	UserID      int64       `json:"user_id"`
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	Type        AccountType `json:"type"`
-	Currency    Currency    `json:"currency"`
-	DebitMinor  int64       `json:"debit_minor"`
-	CreditMinor int64       `json:"credit_minor"`
+	Currency    string      `json:"currency"`
 	DeletedAt   *time.Time  `json:"deleted_at,omitempty"`
 	CreatedAt   time.Time   `json:"created_at"`
 }
 
 func NewAccount(
+	id ID,
 	userID int64,
 	name string,
 	description string,
 	accountType AccountType,
-	currency Currency,
+	currency string,
 ) (Account, error) {
 	account := Account{
+		ID:          id,
 		UserID:      userID,
 		Name:        strings.TrimSpace(name),
 		Description: strings.TrimSpace(description),
@@ -49,17 +45,20 @@ func (a Account) NormalBalance() (BalanceSide, error) {
 }
 
 func (a Account) Validate() error {
+	if a.ID.IsZero() {
+		return domain_errors.ErrAccountIDRequired
+	}
 	if a.UserID <= 0 {
-		return ErrAccountUserRequired
+		return domain_errors.ErrAccountUserRequired
 	}
 	if strings.TrimSpace(a.Name) == "" {
-		return ErrAccountNameRequired
+		return domain_errors.ErrAccountNameRequired
 	}
 	if err := a.Type.Validate(); err != nil {
 		return err
 	}
-	if strings.TrimSpace(string(a.Currency)) == "" {
-		return ErrAccountCurrencyRequired
+	if strings.TrimSpace(a.Currency) == "" {
+		return domain_errors.ErrAccountCurrencyRequired
 	}
 	return nil
 }

@@ -11,9 +11,10 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/dyingvoid/ledger/internal/core/accounts"
+	"github.com/dyingvoid/ledger/internal/core/currencies"
 	"github.com/dyingvoid/ledger/internal/core/deposits"
-	"github.com/dyingvoid/ledger/internal/core/idempotency"
 	accountsv1 "github.com/dyingvoid/ledger/pkg/proto/ledger/accounts/v1"
+	currenciesv1 "github.com/dyingvoid/ledger/pkg/proto/ledger/currencies/v1"
 	fundsv1 "github.com/dyingvoid/ledger/pkg/proto/ledger/funds/v1"
 )
 
@@ -27,8 +28,8 @@ func NewServer(
 	cfg Config,
 	log *slog.Logger,
 	accountsService *accounts.Service,
+	currenciesService *currencies.Service,
 	depositsService *deposits.Service,
-	idempotencyService *idempotency.Service,
 ) (*Server, error) {
 	var listenConfig net.ListenConfig
 	listener, err := listenConfig.Listen(ctx, "tcp", cfg.Addr)
@@ -43,8 +44,9 @@ func NewServer(
 			traceInterceptor(),
 		),
 	)
-	accountsv1.RegisterAccountServiceServer(server, newAccountService(accountsService, idempotencyService))
-	fundsv1.RegisterFundsServiceServer(server, newFundsService(depositsService, idempotencyService))
+	accountsv1.RegisterAccountServiceServer(server, newAccountService(accountsService))
+	currenciesv1.RegisterCurrencyServiceServer(server, newCurrencyService(currenciesService))
+	fundsv1.RegisterFundsServiceServer(server, newFundsService(depositsService))
 	reflection.Register(server)
 
 	return &Server{server: server, listener: listener}, nil

@@ -116,6 +116,8 @@ linters:
       require-specific: true
     revive:
       rules:
+        - name: exported
+          disabled: true
         - name: blank-imports
         - name: context-as-argument
         - name: context-keys-type
