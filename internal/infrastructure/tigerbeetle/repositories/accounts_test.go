@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
@@ -26,6 +27,7 @@ type fakeClient struct {
 	transferCalls     int
 	lookupAccounts    []tigerbeetle_go.Account
 	lookupAccountIDs  []tigerbeetle_go.Uint128
+	lookupErr         error
 	lookupTransfers   []tigerbeetle_go.Transfer
 	lookupTransferIDs []tigerbeetle_go.Uint128
 }
@@ -54,6 +56,9 @@ func (f *fakeClient) CreateTransfers(transfers []tigerbeetle_go.Transfer) ([]tig
 
 func (f *fakeClient) LookupAccounts(ids []tigerbeetle_go.Uint128) ([]tigerbeetle_go.Account, error) {
 	f.lookupAccountIDs = ids
+	if f.lookupErr != nil {
+		return nil, f.lookupErr
+	}
 	return f.lookupAccounts, nil
 }
 
@@ -144,8 +149,8 @@ func TestCreateAccountMapsFields(t *testing.T) {
 	if sent.ID != toTigerbeetleID(account.ID) {
 		t.Fatalf("ID = %s, want %s", sent.ID, account.ID)
 	}
-	if sent.UserData64 != 0 {
-		t.Fatalf("UserData64 = %d, want 0", sent.UserData64)
+	if sent.UserData64 != 7 {
+		t.Fatalf("UserData64 = %d, want 7", sent.UserData64)
 	}
 	if sent.Ledger != 1 {
 		t.Fatalf("Ledger = %d, want 1", sent.Ledger)
@@ -230,6 +235,64 @@ func TestCreateAccountFlags(t *testing.T) {
 	}
 }
 
+func TestGetAccountMapsFields(t *testing.T) {
+	t.Parallel()
+
+	account := testAccount(t, 1000)
+	client := &fakeClient{lookupAccounts: []tigerbeetle_go.Account{{
+		ID:         toTigerbeetleID(account.ID),
+		UserData64: 7,
+		Ledger:     1,
+		Code:       1000,
+	}}}
+	repository := NewAccounts(client, &fakeCurrencies{})
+
+	found, err := repository.Get(context.Background(), account.ID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if len(client.lookupAccountIDs) != 1 {
+		t.Fatalf("LookupAccounts() ids = %d, want 1", len(client.lookupAccountIDs))
+	}
+	if client.lookupAccountIDs[0] != toTigerbeetleID(account.ID) {
+		t.Fatalf("LookupAccounts() id = %s, want %s", client.lookupAccountIDs[0], account.ID)
+	}
+	if found.ID != account.ID {
+		t.Fatalf("ID = %s, want %s", found.ID, account.ID)
+	}
+	if found.UserID != 7 {
+		t.Fatalf("UserID = %d, want 7", found.UserID)
+	}
+	if found.Type != 1000 {
+		t.Fatalf("Type = %d, want 1000", found.Type)
+	}
+}
+
+func TestGetAccountNotFound(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeClient{}
+	repository := NewAccounts(client, &fakeCurrencies{})
+
+	_, err := repository.Get(context.Background(), testAccount(t, 1000).ID)
+	if !errors.Is(err, accounts.ErrAccountNotFound) {
+		t.Fatalf("Get() error = %v, want %v", err, accounts.ErrAccountNotFound)
+	}
+}
+
+func TestGetAccountClientError(t *testing.T) {
+	t.Parallel()
+
+	clientErr := errors.New("connection lost")
+	client := &fakeClient{lookupErr: clientErr}
+	repository := NewAccounts(client, &fakeCurrencies{})
+
+	_, err := repository.Get(context.Background(), testAccount(t, 1000).ID)
+	if !errors.Is(err, accounts.ErrAccountStoreUnavailable) {
+		t.Fatalf("Get() error = %v, want %v", err, accounts.ErrAccountStoreUnavailable)
+	}
+}
+
 func TestCreateAccountResults(t *testing.T) {
 	t.Parallel()
 
@@ -241,9 +304,6 @@ func TestCreateAccountResults(t *testing.T) {
 		{name: "created", status: tigerbeetle_go.AccountCreated},
 		{name: "exists", status: tigerbeetle_go.AccountExists},
 		{name: "different flags", status: tigerbeetle_go.AccountExistsWithDifferentFlags, wantErr: accounts.ErrAccountConflict},
-		{name: "different user data 128", status: tigerbeetle_go.AccountExistsWithDifferentUserData128, wantErr: accounts.ErrAccountConflict},
-		{name: "different user data 64", status: tigerbeetle_go.AccountExistsWithDifferentUserData64, wantErr: accounts.ErrAccountConflict},
-		{name: "different user data 32", status: tigerbeetle_go.AccountExistsWithDifferentUserData32, wantErr: accounts.ErrAccountConflict},
 		{name: "different ledger", status: tigerbeetle_go.AccountExistsWithDifferentLedger, wantErr: accounts.ErrAccountConflict},
 		{name: "different code", status: tigerbeetle_go.AccountExistsWithDifferentCode, wantErr: accounts.ErrAccountConflict},
 	}
@@ -266,6 +326,81 @@ func TestCreateAccountResults(t *testing.T) {
 				t.Fatalf("Create() error = %v, want %v", err, test.wantErr)
 			}
 		})
+	}
+}
+
+func TestCreateAccountDifferentUserData(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		status tigerbeetle_go.CreateAccountStatus
+	}{
+		{name: "user data 128", status: tigerbeetle_go.AccountExistsWithDifferentUserData128},
+		{name: "user data 64", status: tigerbeetle_go.AccountExistsWithDifferentUserData64},
+		{name: "user data 32", status: tigerbeetle_go.AccountExistsWithDifferentUserData32},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			account := testAccount(t, 1000)
+			client := &fakeClient{
+				results: []tigerbeetle_go.CreateAccountResult{{Status: test.status}},
+				lookupAccounts: []tigerbeetle_go.Account{{
+					ID:         toTigerbeetleID(account.ID),
+					UserData64: 99,
+				}},
+			}
+			repository := NewAccounts(client, &fakeCurrencies{info: domain.CurrencyInfo{Ledger: 1}})
+
+			_, err := repository.Create(context.Background(), account)
+			if !errors.Is(err, domain_errors.ErrAccountOwnedByAnotherUser) {
+				t.Fatalf(
+					"Create() error = %v, want %v",
+					err,
+					domain_errors.ErrAccountOwnedByAnotherUser,
+				)
+			}
+			for _, want := range []string{"99", "7", test.status.String()} {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("Create() error %q does not describe %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestCreateAccountDifferentUserDataLookupError(t *testing.T) {
+	t.Parallel()
+
+	lookupErr := errors.New("connection lost")
+	client := &fakeClient{
+		results: []tigerbeetle_go.CreateAccountResult{{
+			Status: tigerbeetle_go.AccountExistsWithDifferentUserData64,
+		}},
+		lookupErr: lookupErr,
+	}
+	repository := NewAccounts(client, &fakeCurrencies{info: domain.CurrencyInfo{Ledger: 1}})
+
+	_, err := repository.Create(context.Background(), testAccount(t, 1000))
+	if !errors.Is(err, accounts.ErrAccountStoreUnavailable) {
+		t.Fatalf("Create() error = %v, want %v", err, accounts.ErrAccountStoreUnavailable)
+	}
+}
+
+func TestCreateAccountDifferentUserDataVanished(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeClient{results: []tigerbeetle_go.CreateAccountResult{{
+		Status: tigerbeetle_go.AccountExistsWithDifferentUserData64,
+	}}}
+	repository := NewAccounts(client, &fakeCurrencies{info: domain.CurrencyInfo{Ledger: 1}})
+
+	_, err := repository.Create(context.Background(), testAccount(t, 1000))
+	if !errors.Is(err, accounts.ErrAccountConflict) {
+		t.Fatalf("Create() error = %v, want %v", err, accounts.ErrAccountConflict)
 	}
 }
 

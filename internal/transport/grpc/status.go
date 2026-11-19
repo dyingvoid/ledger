@@ -31,6 +31,8 @@ func toStatus(err error) error {
 	case errors.Is(err, accounts.ErrAccountStoreUnavailable),
 		errors.Is(err, deposits.ErrLedgerUnavailable):
 		return status.Error(codes.Unavailable, err.Error())
+	case errors.Is(err, domain_errors.ErrAccountOwnedByAnotherUser):
+		return status.Error(codes.PermissionDenied, err.Error())
 	case errors.Is(err, domain_errors.ErrDepositAccountDeleted):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, domain_errors.ErrAccountIDRequired),

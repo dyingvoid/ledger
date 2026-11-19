@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,9 +45,12 @@ func (f *fakeInfoRepository) Get(_ context.Context, _ domain.ID) (domain.Account
 }
 
 type fakeLedgerRepository struct {
-	err     error
-	account domain.Account
-	calls   int
+	err      error
+	getErr   error
+	existing *domain.Account
+	account  domain.Account
+	calls    int
+	getCalls int
 }
 
 func (f *fakeLedgerRepository) Create(_ context.Context, account domain.Account) (domain.Account, error) {
@@ -56,6 +60,17 @@ func (f *fakeLedgerRepository) Create(_ context.Context, account domain.Account)
 	}
 	f.account = account
 	return account, nil
+}
+
+func (f *fakeLedgerRepository) Get(_ context.Context, _ domain.ID) (domain.Account, error) {
+	f.getCalls++
+	if f.getErr != nil {
+		return domain.Account{}, f.getErr
+	}
+	if f.existing == nil {
+		return domain.Account{}, ErrAccountNotFound
+	}
+	return *f.existing, nil
 }
 
 func testAccountID(t *testing.T) domain.ID {
@@ -174,6 +189,9 @@ func TestOpenLedgerAccount(t *testing.T) {
 		if infos.getCalls != 1 {
 			t.Fatalf("Get() calls = %d, want 1", infos.getCalls)
 		}
+		if ledger.getCalls != 1 {
+			t.Fatalf("ledger Get() calls = %d, want 1", ledger.getCalls)
+		}
 		if ledger.calls != 1 {
 			t.Fatalf("Create() calls = %d, want 1", ledger.calls)
 		}
@@ -209,4 +227,80 @@ func TestOpenLedgerAccount(t *testing.T) {
 			t.Fatalf("OpenLedgerAccount() error = %v, want %v", err, ledgerErr)
 		}
 	})
+}
+
+func TestOpenLedgerAccountAlreadyOpen(t *testing.T) {
+	t.Parallel()
+
+	account := domain.Account{
+		ID:       testAccountID(t),
+		UserID:   7,
+		Name:     testAccountName,
+		Type:     2100,
+		Currency: testAccountCurrency,
+	}
+	infos := &fakeInfoRepository{account: account}
+	ledger := &fakeLedgerRepository{existing: &domain.Account{ID: account.ID, UserID: 7}}
+	service := newTestService(infos, ledger)
+
+	opened, err := service.OpenLedgerAccount(context.Background(), account.ID)
+	if err != nil {
+		t.Fatalf("OpenLedgerAccount() error = %v", err)
+	}
+	if opened.ID != account.ID {
+		t.Fatalf("ID = %s, want %s", opened.ID, account.ID)
+	}
+	if opened.Name != account.Name {
+		t.Fatalf("Name = %q, want %q", opened.Name, account.Name)
+	}
+	if ledger.calls != 0 {
+		t.Fatalf("Create() calls = %d, want 0", ledger.calls)
+	}
+}
+
+func TestOpenLedgerAccountOwnedByAnotherUser(t *testing.T) {
+	t.Parallel()
+
+	account := domain.Account{
+		ID:       testAccountID(t),
+		UserID:   7,
+		Name:     testAccountName,
+		Type:     2100,
+		Currency: testAccountCurrency,
+	}
+	infos := &fakeInfoRepository{account: account}
+	ledger := &fakeLedgerRepository{existing: &domain.Account{ID: account.ID, UserID: 99}}
+	service := newTestService(infos, ledger)
+
+	_, err := service.OpenLedgerAccount(context.Background(), account.ID)
+	if !errors.Is(err, domain_errors.ErrAccountOwnedByAnotherUser) {
+		t.Fatalf(
+			"OpenLedgerAccount() error = %v, want %v",
+			err,
+			domain_errors.ErrAccountOwnedByAnotherUser,
+		)
+	}
+	if !strings.Contains(err.Error(), "99") || !strings.Contains(err.Error(), "7") {
+		t.Fatalf("error %q does not describe both user IDs", err)
+	}
+	if ledger.calls != 0 {
+		t.Fatalf("Create() calls = %d, want 0", ledger.calls)
+	}
+}
+
+func TestOpenLedgerAccountLookupError(t *testing.T) {
+	t.Parallel()
+
+	getErr := errors.New("tigerbeetle unavailable")
+	infos := &fakeInfoRepository{account: domain.Account{ID: testAccountID(t), UserID: 7}}
+	ledger := &fakeLedgerRepository{getErr: getErr}
+	service := newTestService(infos, ledger)
+
+	_, err := service.OpenLedgerAccount(context.Background(), testAccountID(t))
+	if !errors.Is(err, getErr) {
+		t.Fatalf("OpenLedgerAccount() error = %v, want %v", err, getErr)
+	}
+	if ledger.calls != 0 {
+		t.Fatalf("Create() calls = %d, want 0", ledger.calls)
+	}
 }

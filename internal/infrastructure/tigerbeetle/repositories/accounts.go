@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	tigerbeetle_go "github.com/tigerbeetle/tigerbeetle-go"
@@ -43,7 +44,7 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 
 	results, err := r.client.CreateAccounts([]tigerbeetle_go.Account{{
 		ID:         toTigerbeetleID(account.ID),
-		UserData64: uint64(account.UserID),
+		UserData64: uint64(account.UserID), //nolint:gosec // UserID is validated as positive before reaching the repository.
 		Ledger:     info.Ledger,
 		Code:       uint16(account.Type), //nolint:gosec // Account types are validated to be between 1000 and 5999.
 		Flags:      flags,
@@ -63,10 +64,11 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 	switch results[0].Status {
 	case tigerbeetle_go.AccountCreated, tigerbeetle_go.AccountExists:
 		return account, nil
-	case tigerbeetle_go.AccountExistsWithDifferentFlags,
-		tigerbeetle_go.AccountExistsWithDifferentUserData128,
+	case tigerbeetle_go.AccountExistsWithDifferentUserData128,
 		tigerbeetle_go.AccountExistsWithDifferentUserData64,
-		tigerbeetle_go.AccountExistsWithDifferentUserData32,
+		tigerbeetle_go.AccountExistsWithDifferentUserData32:
+		return domain.Account{}, r.ownershipConflict(ctx, account, results[0].Status)
+	case tigerbeetle_go.AccountExistsWithDifferentFlags,
 		tigerbeetle_go.AccountExistsWithDifferentLedger,
 		tigerbeetle_go.AccountExistsWithDifferentCode:
 		return domain.Account{}, fmt.Errorf("%w: %s", accounts.ErrAccountConflict, results[0].Status)
@@ -77,6 +79,54 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 			results[0].Status,
 		)
 	}
+}
+
+func (r *Accounts) ownershipConflict(
+	ctx context.Context,
+	account domain.Account,
+	status tigerbeetle_go.CreateAccountStatus,
+) error {
+	existing, err := r.Get(ctx, account.ID)
+	if errors.Is(err, accounts.ErrAccountNotFound) {
+		return fmt.Errorf("%w: %s", accounts.ErrAccountConflict, account.ID)
+	}
+	if err != nil {
+		return err
+	}
+
+	return fmt.Errorf(
+		"%w: account %s exists with different user data (%s): stored user %d, requested user %d",
+		domain_errors.ErrAccountOwnedByAnotherUser,
+		account.ID,
+		status,
+		existing.UserID,
+		account.UserID,
+	)
+}
+
+func (r *Accounts) Get(_ context.Context, id domain.ID) (domain.Account, error) {
+	// TODO: check why doesn't use context
+	found, err := r.client.LookupAccounts([]tigerbeetle_go.Uint128{toTigerbeetleID(id)})
+	if err != nil {
+		return domain.Account{}, fmt.Errorf("%w: %w", accounts.ErrAccountStoreUnavailable, err)
+	}
+	if len(found) == 0 {
+		return domain.Account{}, fmt.Errorf("%w: %s", accounts.ErrAccountNotFound, id)
+	}
+	if len(found) != 1 {
+		return domain.Account{}, fmt.Errorf(
+			"%w: expected 1 account, got %d",
+			accounts.ErrAccountStoreUnavailable,
+			len(found),
+		)
+	}
+
+	// TODO: need separate domain entity for ledger info
+	return domain.Account{
+		ID:     fromTigerbeetleID(found[0].ID),
+		UserID: int64(found[0].UserData64), //nolint:gosec // UserData64 stores a validated positive UserID.
+		Type:   domain.AccountType(found[0].Code),
+	}, nil
 }
 
 func accountFlags(account domain.Account) (uint16, error) {
