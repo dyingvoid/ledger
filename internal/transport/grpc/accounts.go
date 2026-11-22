@@ -23,7 +23,7 @@ func (s *accountService) CreateAccountInfo(
 	ctx context.Context,
 	req *accountsv1.CreateAccountInfoRequest,
 ) (*accountsv1.CreateAccountInfoResponse, error) {
-	id, err := parseID(req.GetId())
+	id, err := domain.ParseID(req.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (s *accountService) CreateAccountInfo(
 		Currency:    req.GetCurrency(),
 	})
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, err
 	}
 
 	return &accountsv1.CreateAccountInfoResponse{
@@ -49,14 +49,14 @@ func (s *accountService) OpenLedgerAccount(
 	ctx context.Context,
 	req *accountsv1.OpenLedgerAccountRequest,
 ) (*accountsv1.OpenLedgerAccountResponse, error) {
-	id, err := parseID(req.GetId())
+	id, err := domain.ParseID(req.GetId())
 	if err != nil {
 		return nil, err
 	}
 
 	account, err := s.accounts.OpenLedgerAccount(ctx, id)
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, err
 	}
 
 	return &accountsv1.OpenLedgerAccountResponse{

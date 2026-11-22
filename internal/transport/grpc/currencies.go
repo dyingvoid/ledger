@@ -27,7 +27,7 @@ func (s *currencyService) CreateCurrency(
 		AssetScale: req.GetAssetScale(),
 	})
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, err
 	}
 
 	return &currenciesv1.CreateCurrencyResponse{

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dyingvoid/ledger/internal/core/deposits"
+	"github.com/dyingvoid/ledger/internal/domain"
 	fundsv1 "github.com/dyingvoid/ledger/pkg/proto/ledger/funds/v1"
 )
 
@@ -20,12 +21,12 @@ func (s *fundsService) Deposit(
 	ctx context.Context,
 	req *fundsv1.DepositRequest,
 ) (*fundsv1.DepositResponse, error) {
-	id, err := parseID(req.GetId())
+	id, err := domain.ParseID(req.GetId())
 	if err != nil {
 		return nil, err
 	}
 
-	accountID, err := parseID(req.GetAccountId())
+	accountID, err := domain.ParseID(req.GetAccountId())
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +38,7 @@ func (s *fundsService) Deposit(
 		Currency:    req.GetCurrency(),
 	})
 	if err != nil {
-		return nil, toStatus(err)
+		return nil, err
 	}
 
 	return &fundsv1.DepositResponse{

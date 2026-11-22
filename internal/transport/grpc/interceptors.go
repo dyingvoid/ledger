@@ -21,6 +21,19 @@ func loggerInterceptor(log *slog.Logger) grpcpkg.UnaryServerInterceptor {
 	}
 }
 
+func statusErrorInterceptor() grpcpkg.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, _ *grpcpkg.UnaryServerInfo, handler grpcpkg.UnaryHandler) (any, error) {
+		response, err := handler(ctx, req)
+		if err == nil {
+			return response, nil
+		}
+		if _, ok := status.FromError(err); ok {
+			return response, err
+		}
+		return response, toStatus(err)
+	}
+}
+
 func recoverInterceptor() grpcpkg.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpcpkg.UnaryServerInfo, handler grpcpkg.UnaryHandler) (response any, err error) {
 		defer func() {

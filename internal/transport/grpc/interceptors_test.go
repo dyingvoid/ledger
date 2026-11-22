@@ -3,6 +3,7 @@ package grpc
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	domain_errors "github.com/dyingvoid/ledger/internal/domain/errors"
 	"github.com/dyingvoid/ledger/internal/logger"
 )
 
@@ -58,6 +60,63 @@ func TestRecoverInterceptor(t *testing.T) {
 	if !strings.Contains(output.String(), "grpc handler panic") {
 		t.Fatalf("output %q does not contain panic log", output.String())
 	}
+}
+
+func TestStatusErrorInterceptor(t *testing.T) {
+	t.Parallel()
+
+	t.Run("maps raw error", func(t *testing.T) {
+		interceptor := statusErrorInterceptor()
+
+		_, err := interceptor(
+			context.Background(),
+			nil,
+			&grpcpkg.UnaryServerInfo{FullMethod: "/test.Service/Method"},
+			func(context.Context, any) (any, error) {
+				return nil, fmt.Errorf("parsing account id: %w", domain_errors.ErrAccountIDRequired)
+			},
+		)
+		if status.Code(err) != codes.InvalidArgument {
+			t.Fatalf("status code = %v, want %v", status.Code(err), codes.InvalidArgument)
+		}
+	})
+
+	t.Run("preserves grpc status", func(t *testing.T) {
+		interceptor := statusErrorInterceptor()
+		wantErr := status.Error(codes.PermissionDenied, "permission denied")
+
+		_, err := interceptor(
+			context.Background(),
+			nil,
+			&grpcpkg.UnaryServerInfo{FullMethod: "/test.Service/Method"},
+			func(context.Context, any) (any, error) {
+				return nil, wantErr
+			},
+		)
+		if err != wantErr {
+			t.Fatalf("error = %v, want original status error", err)
+		}
+	})
+
+	t.Run("passes nil error", func(t *testing.T) {
+		interceptor := statusErrorInterceptor()
+		wantResponse := "response"
+
+		response, err := interceptor(
+			context.Background(),
+			nil,
+			&grpcpkg.UnaryServerInfo{FullMethod: "/test.Service/Method"},
+			func(context.Context, any) (any, error) {
+				return wantResponse, nil
+			},
+		)
+		if err != nil {
+			t.Fatalf("interceptor error = %v", err)
+		}
+		if response != wantResponse {
+			t.Fatalf("response = %v, want %v", response, wantResponse)
+		}
+	})
 }
 
 func TestTraceInterceptor(t *testing.T) {

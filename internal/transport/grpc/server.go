@@ -42,6 +42,7 @@ func NewServer(
 			loggerInterceptor(log),
 			recoverInterceptor(),
 			traceInterceptor(),
+			statusErrorInterceptor(),
 		),
 	)
 	accountsv1.RegisterAccountServiceServer(server, newAccountService(accountsService))
