@@ -3,6 +3,7 @@ package grpc
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -16,6 +17,8 @@ import (
 	"github.com/dyingvoid/ledger/internal/logger"
 )
 
+const testFullMethod = "/test.Service/Method"
+
 func TestLoggerInterceptor(t *testing.T) {
 	t.Parallel()
 
@@ -25,7 +28,7 @@ func TestLoggerInterceptor(t *testing.T) {
 	_, err := interceptor(
 		context.Background(),
 		nil,
-		&grpcpkg.UnaryServerInfo{FullMethod: "/test.Service/Method"},
+		&grpcpkg.UnaryServerInfo{FullMethod: testFullMethod},
 		func(ctx context.Context, _ any) (any, error) {
 			if logger.FromContext(ctx) == base {
 				t.Error("handler context logger is the base logger, want request logger")
@@ -66,12 +69,14 @@ func TestStatusErrorInterceptor(t *testing.T) {
 	t.Parallel()
 
 	t.Run("maps raw error", func(t *testing.T) {
+		t.Parallel()
+
 		interceptor := statusErrorInterceptor()
 
 		_, err := interceptor(
 			context.Background(),
 			nil,
-			&grpcpkg.UnaryServerInfo{FullMethod: "/test.Service/Method"},
+			&grpcpkg.UnaryServerInfo{FullMethod: testFullMethod},
 			func(context.Context, any) (any, error) {
 				return nil, fmt.Errorf("parsing account id: %w", domain_errors.ErrAccountIDRequired)
 			},
@@ -82,30 +87,34 @@ func TestStatusErrorInterceptor(t *testing.T) {
 	})
 
 	t.Run("preserves grpc status", func(t *testing.T) {
+		t.Parallel()
+
 		interceptor := statusErrorInterceptor()
 		wantErr := status.Error(codes.PermissionDenied, "permission denied")
 
 		_, err := interceptor(
 			context.Background(),
 			nil,
-			&grpcpkg.UnaryServerInfo{FullMethod: "/test.Service/Method"},
+			&grpcpkg.UnaryServerInfo{FullMethod: testFullMethod},
 			func(context.Context, any) (any, error) {
 				return nil, wantErr
 			},
 		)
-		if err != wantErr {
+		if !errors.Is(err, wantErr) {
 			t.Fatalf("error = %v, want original status error", err)
 		}
 	})
 
 	t.Run("passes nil error", func(t *testing.T) {
+		t.Parallel()
+
 		interceptor := statusErrorInterceptor()
 		wantResponse := "response"
 
 		response, err := interceptor(
 			context.Background(),
 			nil,
-			&grpcpkg.UnaryServerInfo{FullMethod: "/test.Service/Method"},
+			&grpcpkg.UnaryServerInfo{FullMethod: testFullMethod},
 			func(context.Context, any) (any, error) {
 				return wantResponse, nil
 			},
@@ -130,7 +139,7 @@ func TestTraceInterceptor(t *testing.T) {
 	_, err := interceptor(
 		ctx,
 		nil,
-		&grpcpkg.UnaryServerInfo{FullMethod: "/test.Service/Method"},
+		&grpcpkg.UnaryServerInfo{FullMethod: testFullMethod},
 		func(context.Context, any) (any, error) {
 			return nil, status.Error(codes.InvalidArgument, "invalid")
 		},
