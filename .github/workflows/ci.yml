@@ -27,6 +27,7 @@ jobs:
           go-version-file: services/accounting/go.mod
           cache: true
           cache-dependency-path: |
+            shared/go.sum
             services/accounting/go.sum
             services/bff/go.sum
 
@@ -34,22 +35,23 @@ jobs:
         run: go work sync
 
       - name: Check formatting
-        run: test -z "$(gofmt -l services)"
+        run: test -z "$(gofmt -l shared services)"
 
       - name: Check modules are tidy
         run: |
+          go -C shared mod tidy
           go -C services/accounting mod tidy
           go -C services/bff mod tidy
-          git diff --exit-code -- services/accounting/go.mod services/accounting/go.sum services/bff/go.mod services/bff/go.sum
+          git diff --exit-code -- shared/go.mod shared/go.sum services/accounting/go.mod services/accounting/go.sum services/bff/go.mod services/bff/go.sum
 
       - name: Vet
-        run: go vet ./services/accounting/... ./services/bff/...
+        run: go vet ./shared/... ./services/accounting/... ./services/bff/...
 
       - name: Test
-        run: go test -race ./services/accounting/... ./services/bff/...
+        run: go test -race ./shared/... ./services/accounting/... ./services/bff/...
 
       - name: Build
-        run: go build ./services/accounting/... ./services/bff/...
+        run: go build ./shared/... ./services/accounting/... ./services/bff/...
 
   lint:
     name: Lint
@@ -65,6 +67,7 @@ jobs:
           go-version-file: services/accounting/go.mod
           cache: true
           cache-dependency-path: |
+            shared/go.sum
             services/accounting/go.sum
             services/bff/go.sum
 

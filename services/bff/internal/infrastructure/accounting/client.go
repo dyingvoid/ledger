@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	currenciesv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/currencies/v1"
 	"github.com/dyingvoid/ledger/services/bff/internal/domain"
+	currenciesv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/currencies/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

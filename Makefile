@@ -1,9 +1,10 @@
 -include .env
 export
 
+SHARED_DIR := shared
 ACCOUNTING_DIR := services/accounting
 BFF_DIR := services/bff
-GO_PACKAGES := ./$(ACCOUNTING_DIR)/... ./$(BFF_DIR)/...
+GO_PACKAGES := ./$(SHARED_DIR)/... ./$(ACCOUNTING_DIR)/... ./$(BFF_DIR)/...
 MIGRATE_LOCK_TIMEOUT ?= 5
 RATE ?= 6
 DURATION ?= 1m
@@ -42,7 +43,7 @@ test:
 	@go test -race $(GO_PACKAGES)
 
 fmt:
-	@gofmt -s -w services
+	@gofmt -s -w shared services
 
 vet:
 	@go vet $(GO_PACKAGES)
@@ -54,6 +55,7 @@ lint-fix:
 	@docker compose run --rm lint run --fix ./services/accounting/... ./services/bff/...
 
 tidy:
+	@go -C $(SHARED_DIR) mod tidy
 	@go -C $(ACCOUNTING_DIR) mod tidy
 	@go -C $(BFF_DIR) mod tidy
 	@go work sync
@@ -114,10 +116,10 @@ migrate-create:
 		-seq "$(seq)"
 
 proto-gen:
-	@cd $(ACCOUNTING_DIR)/proto && buf generate
+	@cd $(SHARED_DIR)/proto && buf generate
 
 proto-lint:
-	@cd $(ACCOUNTING_DIR)/proto && buf lint
+	@cd $(SHARED_DIR)/proto && buf lint
 
 loadtest-accounts:
 	@set -a; . ./.env; [ -f loadtest/seed.env ] && . ./loadtest/seed.env; set +a; \

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/dyingvoid/ledger/services/accounting/internal/core/currencies"
-	currenciesv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/currencies/v1"
+	currenciesv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/currencies/v1"
 )
 
 type currencyService struct {

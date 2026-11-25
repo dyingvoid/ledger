@@ -4,7 +4,7 @@ package ledger.accounts.v1;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/accounts/v1;accountsv1";
+option go_package = "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/accounts/v1;accountsv1";
 
 service AccountService {
   rpc CreateAccountInfo(CreateAccountInfoRequest) returns (CreateAccountInfoResponse);

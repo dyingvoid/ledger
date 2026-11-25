@@ -7,7 +7,7 @@ import (
 
 	"github.com/dyingvoid/ledger/services/accounting/internal/core/accounts"
 	"github.com/dyingvoid/ledger/services/accounting/internal/domain"
-	accountsv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/accounts/v1"
+	accountsv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/accounts/v1"
 )
 
 type accountService struct {

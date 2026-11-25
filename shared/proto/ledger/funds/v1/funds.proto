@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package ledger.funds.v1;
 
-option go_package = "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/funds/v1;fundsv1";
+option go_package = "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/funds/v1;fundsv1";
 
 service FundsService {
   rpc Deposit(DepositRequest) returns (DepositResponse);

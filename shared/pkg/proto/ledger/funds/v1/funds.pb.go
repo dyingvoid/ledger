@@ -148,7 +148,7 @@ const file_ledger_funds_v1_funds_proto_rawDesc = "" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId2\\\n" +
 	"\fFundsService\x12L\n" +
-	"\aDeposit\x12\x1f.ledger.funds.v1.DepositRequest\x1a .ledger.funds.v1.DepositResponseBSZQgithub.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/funds/v1;fundsv1b\x06proto3"
+	"\aDeposit\x12\x1f.ledger.funds.v1.DepositRequest\x1a .ledger.funds.v1.DepositResponseBFZDgithub.com/dyingvoid/ledger/shared/pkg/proto/ledger/funds/v1;fundsv1b\x06proto3"
 
 var (
 	file_ledger_funds_v1_funds_proto_rawDescOnce sync.Once

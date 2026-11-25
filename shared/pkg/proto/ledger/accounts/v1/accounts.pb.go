@@ -359,7 +359,7 @@ const file_ledger_accounts_v1_accounts_proto_rawDesc = "" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xf4\x01\n" +
 	"\x0eAccountService\x12p\n" +
 	"\x11CreateAccountInfo\x12,.ledger.accounts.v1.CreateAccountInfoRequest\x1a-.ledger.accounts.v1.CreateAccountInfoResponse\x12p\n" +
-	"\x11OpenLedgerAccount\x12,.ledger.accounts.v1.OpenLedgerAccountRequest\x1a-.ledger.accounts.v1.OpenLedgerAccountResponseBYZWgithub.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/accounts/v1;accountsv1b\x06proto3"
+	"\x11OpenLedgerAccount\x12,.ledger.accounts.v1.OpenLedgerAccountRequest\x1a-.ledger.accounts.v1.OpenLedgerAccountResponseBLZJgithub.com/dyingvoid/ledger/shared/pkg/proto/ledger/accounts/v1;accountsv1b\x06proto3"
 
 var (
 	file_ledger_accounts_v1_accounts_proto_rawDescOnce sync.Once

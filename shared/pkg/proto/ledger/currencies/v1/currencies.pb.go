@@ -221,7 +221,7 @@ const file_ledger_currencies_v1_currencies_proto_rawDesc = "" +
 	"\vasset_scale\x18\x04 \x01(\x05R\n" +
 	"assetScale2~\n" +
 	"\x0fCurrencyService\x12k\n" +
-	"\x0eCreateCurrency\x12+.ledger.currencies.v1.CreateCurrencyRequest\x1a,.ledger.currencies.v1.CreateCurrencyResponseB]Z[github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/currencies/v1;currenciesv1b\x06proto3"
+	"\x0eCreateCurrency\x12+.ledger.currencies.v1.CreateCurrencyRequest\x1a,.ledger.currencies.v1.CreateCurrencyResponseBPZNgithub.com/dyingvoid/ledger/shared/pkg/proto/ledger/currencies/v1;currenciesv1b\x06proto3"
 
 var (
 	file_ledger_currencies_v1_currencies_proto_rawDescOnce sync.Once
