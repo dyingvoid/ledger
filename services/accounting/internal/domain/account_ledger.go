@@ -3,7 +3,7 @@ package domain
 import domain_errors "github.com/dyingvoid/ledger/services/accounting/internal/domain/errors"
 
 type AccountLedger struct {
-	ID     ID          `json:"id"`
+	ID     ID          `json:"ledger_id"`
 	UserID int64       `json:"user_id"`
 	Ledger uint32      `json:"ledger"`
 	Type   AccountType `json:"type"`

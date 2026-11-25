@@ -8,7 +8,7 @@ import (
 )
 
 type AccountInfo struct {
-	ID          ID          `json:"id"`
+	ID          ID          `json:"info_id"`
 	UserID      int64       `json:"user_id"`
 	Name        string      `json:"name"`
 	Description string      `json:"description"`

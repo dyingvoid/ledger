@@ -1,6 +1,6 @@
 package domain
 
 type Account struct {
-	AccountInfo
-	AccountLedger
+	Info   *AccountInfo   `json:"info"`
+	Ledger *AccountLedger `json:"ledger"`
 }
