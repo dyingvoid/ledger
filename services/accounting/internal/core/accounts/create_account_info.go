@@ -9,7 +9,6 @@ import (
 	"github.com/dyingvoid/ledger/services/accounting/internal/logger"
 )
 
-// TODO: move errors to separate file, remove some of them
 var (
 	ErrAccountNotFound         = errors.New("account not found")
 	ErrBankCashAccountNotFound = errors.New("bank cash account not found")

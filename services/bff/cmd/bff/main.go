@@ -13,8 +13,10 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/dyingvoid/ledger/services/bff/internal/core/accounts"
 	"github.com/dyingvoid/ledger/services/bff/internal/core/currencies"
 	"github.com/dyingvoid/ledger/services/bff/internal/infrastructure/accounting"
+	"github.com/dyingvoid/ledger/services/bff/internal/infrastructure/temporal"
 	transporthttp "github.com/dyingvoid/ledger/services/bff/internal/transport/http"
 )
 
@@ -47,6 +49,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("loading accounting config: %w", err)
 	}
+	temporalCfg, err := temporal.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("loading temporal config: %w", err)
+	}
 
 	client, err := accounting.NewClient(accountingCfg)
 	if err != nil {
@@ -58,8 +64,21 @@ func run() error {
 		}
 	}()
 
-	service := currencies.NewService(client)
-	handler := transporthttp.NewHandler(service, log)
+	temporalClient, err := temporal.NewClient(temporalCfg)
+	if err != nil {
+		return err
+	}
+	defer temporalClient.Close()
+
+	temporalWorker := temporal.NewWorker(temporalClient, temporal.NewActivities(client))
+	if err := temporalWorker.Start(); err != nil {
+		return fmt.Errorf("starting temporal worker: %w", err)
+	}
+	defer temporalWorker.Stop()
+
+	currencyService := currencies.NewService(client)
+	accountService := accounts.NewService(temporalClient, accounting.NewIDGenerator())
+	handler := transporthttp.NewHandler(currencyService, accountService, log)
 	server := transporthttp.NewServer(httpCfg, handler.Routes())
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
