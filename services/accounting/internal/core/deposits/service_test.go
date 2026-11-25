@@ -12,26 +12,26 @@ import (
 const testCurrency = "USD"
 
 type fakeAccountRepository struct {
-	client      domain.Account
-	bank        domain.Account
+	client      domain.AccountInfo
+	bank        domain.AccountInfo
 	clientErr   error
 	bankErr     error
 	clientCalls int
 	bankCalls   int
 }
 
-func (f *fakeAccountRepository) Get(_ context.Context, _ domain.ID) (domain.Account, error) {
+func (f *fakeAccountRepository) Get(_ context.Context, _ domain.ID) (domain.AccountInfo, error) {
 	f.clientCalls++
 	if f.clientErr != nil {
-		return domain.Account{}, f.clientErr
+		return domain.AccountInfo{}, f.clientErr
 	}
 	return f.client, nil
 }
 
-func (f *fakeAccountRepository) GetBankCash(_ context.Context, _ string) (domain.Account, error) {
+func (f *fakeAccountRepository) GetBankCash(_ context.Context, _ string) (domain.AccountInfo, error) {
 	f.bankCalls++
 	if f.bankErr != nil {
-		return domain.Account{}, f.bankErr
+		return domain.AccountInfo{}, f.bankErr
 	}
 	return f.bank, nil
 }
@@ -84,7 +84,7 @@ func testService(
 	t.Helper()
 
 	if accounts.client.ID.IsZero() {
-		accounts.client = domain.Account{
+		accounts.client = domain.AccountInfo{
 			ID:       testID(t, "1"),
 			UserID:   7,
 			Name:     "Client",
@@ -93,7 +93,7 @@ func testService(
 		}
 	}
 	if accounts.bank.ID.IsZero() {
-		accounts.bank = domain.Account{
+		accounts.bank = domain.AccountInfo{
 			ID:       testID(t, "2"),
 			UserID:   1,
 			Name:     "Bank Cash",

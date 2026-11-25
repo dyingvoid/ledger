@@ -12,8 +12,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	accountsv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/accounts/v1"
-	currenciesv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/currencies/v1"
+	accountsv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/accounts/v1"
+	currenciesv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/currencies/v1"
 )
 
 const (

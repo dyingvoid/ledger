@@ -7,7 +7,7 @@ import (
 
 	"github.com/dyingvoid/ledger/services/accounting/internal/core/accounts"
 	"github.com/dyingvoid/ledger/services/accounting/internal/domain"
-	accountsv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/accounts/v1"
+	accountsv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/accounts/v1"
 )
 
 type accountService struct {
@@ -41,7 +41,7 @@ func (s *accountService) CreateAccountInfo(
 	}
 
 	return &accountsv1.CreateAccountInfoResponse{
-		Account: toProtoAccount(account),
+		Account: toProtoAccountInfo(account),
 	}, nil
 }
 
@@ -60,11 +60,11 @@ func (s *accountService) OpenLedgerAccount(
 	}
 
 	return &accountsv1.OpenLedgerAccountResponse{
-		Account: toProtoAccount(account),
+		Account: toProtoAccountLedger(account),
 	}, nil
 }
 
-func toProtoAccount(account domain.Account) *accountsv1.AccountInfo {
+func toProtoAccountInfo(account domain.AccountInfo) *accountsv1.AccountInfo {
 	response := &accountsv1.AccountInfo{
 		Id:          account.ID.String(),
 		UserId:      account.UserID,
@@ -77,4 +77,13 @@ func toProtoAccount(account domain.Account) *accountsv1.AccountInfo {
 		response.CreatedAt = timestamppb.New(account.CreatedAt)
 	}
 	return response
+}
+
+func toProtoAccountLedger(account domain.AccountLedger) *accountsv1.AccountLedger {
+	return &accountsv1.AccountLedger{
+		Id:     account.ID.String(),
+		UserId: account.UserID,
+		Ledger: account.Ledger,
+		Type:   int32(account.Type),
+	}
 }

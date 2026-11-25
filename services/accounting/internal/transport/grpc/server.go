@@ -13,9 +13,9 @@ import (
 	"github.com/dyingvoid/ledger/services/accounting/internal/core/accounts"
 	"github.com/dyingvoid/ledger/services/accounting/internal/core/currencies"
 	"github.com/dyingvoid/ledger/services/accounting/internal/core/deposits"
-	accountsv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/accounts/v1"
-	currenciesv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/currencies/v1"
-	fundsv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/funds/v1"
+	accountsv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/accounts/v1"
+	currenciesv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/currencies/v1"
+	fundsv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/funds/v1"
 )
 
 type Server struct {

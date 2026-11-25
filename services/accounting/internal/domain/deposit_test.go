@@ -19,10 +19,10 @@ func testDepositCurrencyInfo() CurrencyInfo {
 	}
 }
 
-func testDepositAccount(t *testing.T, id string, accountType AccountType, currency string) Account {
+func testDepositAccount(t *testing.T, id string, accountType AccountType, currency string) AccountInfo {
 	t.Helper()
 
-	return Account{
+	return AccountInfo{
 		ID:       testID(t, id),
 		UserID:   1,
 		Name:     "Account " + id,

@@ -9,7 +9,6 @@ import (
 	"github.com/dyingvoid/ledger/services/accounting/internal/logger"
 )
 
-// TODO: move errors to separate file, remove some of them
 var (
 	ErrAccountNotFound         = errors.New("account not found")
 	ErrBankCashAccountNotFound = errors.New("bank cash account not found")
@@ -31,8 +30,8 @@ type CreateAccountInfoParams struct {
 func (s *Service) CreateAccountInfo(
 	ctx context.Context,
 	params CreateAccountInfoParams,
-) (domain.Account, error) {
-	account, err := domain.NewAccount(
+) (domain.AccountInfo, error) {
+	account, err := domain.NewAccountInfo(
 		params.ID,
 		params.UserID,
 		params.Name,
@@ -41,12 +40,12 @@ func (s *Service) CreateAccountInfo(
 		params.Currency,
 	)
 	if err != nil {
-		return domain.Account{}, fmt.Errorf("validating account: %w", err)
+		return domain.AccountInfo{}, fmt.Errorf("validating account: %w", err)
 	}
 
 	created, err := s.infos.Create(ctx, account)
 	if err != nil {
-		return domain.Account{}, fmt.Errorf("creating account info: %w", err)
+		return domain.AccountInfo{}, fmt.Errorf("creating account info: %w", err)
 	}
 
 	logger.FromContext(ctx).InfoContext(

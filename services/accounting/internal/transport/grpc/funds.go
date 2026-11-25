@@ -5,7 +5,7 @@ import (
 
 	"github.com/dyingvoid/ledger/services/accounting/internal/core/deposits"
 	"github.com/dyingvoid/ledger/services/accounting/internal/domain"
-	fundsv1 "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/funds/v1"
+	fundsv1 "github.com/dyingvoid/ledger/shared/pkg/proto/ledger/funds/v1"
 )
 
 type fundsService struct {

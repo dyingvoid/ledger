@@ -1,9 +1,10 @@
 -include .env
 export
 
+SHARED_DIR := shared
 ACCOUNTING_DIR := services/accounting
 BFF_DIR := services/bff
-GO_PACKAGES := ./$(ACCOUNTING_DIR)/... ./$(BFF_DIR)/...
+GO_PACKAGES := ./$(SHARED_DIR)/... ./$(ACCOUNTING_DIR)/... ./$(BFF_DIR)/...
 MIGRATE_LOCK_TIMEOUT ?= 5
 RATE ?= 6
 DURATION ?= 1m
@@ -13,6 +14,7 @@ DURATION ?= 1m
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
 	tigerbeetle-up tigerbeetle-down tigerbeetle-logs \
+	temporal-up temporal-down temporal-logs \
 	migrate-up migrate-down migrate-action migrate-create \
 	proto-gen proto-lint \
 	loadtest-accounts loadtest-deposit loadtest-matrix
@@ -42,7 +44,7 @@ test:
 	@go test -race $(GO_PACKAGES)
 
 fmt:
-	@gofmt -s -w services
+	@gofmt -s -w shared services
 
 vet:
 	@go vet $(GO_PACKAGES)
@@ -54,9 +56,10 @@ lint-fix:
 	@docker compose run --rm lint run --fix ./services/accounting/... ./services/bff/...
 
 tidy:
+	@go work sync
+	@go -C $(SHARED_DIR) mod tidy
 	@go -C $(ACCOUNTING_DIR) mod tidy
 	@go -C $(BFF_DIR) mod tidy
-	@go work sync
 
 docker-up:
 	@docker compose up -d --build --wait
@@ -65,7 +68,7 @@ docker-down:
 	@docker compose down
 
 docker-logs:
-	@docker compose logs -f accounting bff
+	@docker compose logs -f accounting bff temporal
 
 postgres-up:
 	@docker compose up -d --wait postgres
@@ -84,6 +87,15 @@ tigerbeetle-down:
 
 tigerbeetle-logs:
 	@docker compose logs -f tigerbeetle
+
+temporal-up:
+	@docker compose up -d --wait temporal
+
+temporal-down:
+	@docker compose down
+
+temporal-logs:
+	@docker compose logs -f temporal
 
 migrate-up:
 	@$(MAKE) migrate-action action=up
@@ -114,10 +126,10 @@ migrate-create:
 		-seq "$(seq)"
 
 proto-gen:
-	@cd $(ACCOUNTING_DIR)/proto && buf generate
+	@cd $(SHARED_DIR)/proto && buf generate
 
 proto-lint:
-	@cd $(ACCOUNTING_DIR)/proto && buf lint
+	@cd $(SHARED_DIR)/proto && buf lint
 
 loadtest-accounts:
 	@set -a; . ./.env; [ -f loadtest/seed.env ] && . ./loadtest/seed.env; set +a; \

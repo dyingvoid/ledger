@@ -2,12 +2,16 @@ FROM golang:1.27.3-bookworm AS build
 
 WORKDIR /src
 
-COPY services/accounting/go.mod services/accounting/go.sum ./
-RUN go mod download
+COPY shared/go.mod shared/go.sum ./shared/
+RUN go -C shared mod download
 
-COPY services/accounting/ ./
+COPY services/accounting/go.mod services/accounting/go.sum ./services/accounting/
+RUN go -C services/accounting mod download
 
-RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/ledger ./cmd/ledger
+COPY shared ./shared
+COPY services/accounting ./services/accounting
+
+RUN CGO_ENABLED=1 go -C services/accounting build -trimpath -ldflags="-s -w" -o /out/ledger ./cmd/ledger
 
 FROM gcr.io/distroless/cc-debian12:nonroot
 

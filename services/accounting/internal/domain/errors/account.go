@@ -7,4 +7,5 @@ var (
 	ErrAccountNameRequired       = errors.New("account name is required")
 	ErrAccountUserRequired       = errors.New("account user ID is required")
 	ErrAccountOwnedByAnotherUser = errors.New("account belongs to another user")
+	ErrAccountLedgerRequired     = errors.New("account ledger is required")
 )

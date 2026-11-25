@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE SCHEMA ledger;
+CREATE SCHEMA IF NOT EXISTS ledger;
 
 CREATE TABLE ledger.account_type (
     code INTEGER PRIMARY KEY CHECK (code BETWEEN 1000 AND 5999),

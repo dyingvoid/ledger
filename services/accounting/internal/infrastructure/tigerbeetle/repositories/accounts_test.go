@@ -105,7 +105,7 @@ func (f *fakeCurrencies) Get(_ context.Context, _ string) (domain.CurrencyInfo, 
 	return f.info, nil
 }
 
-func testAccount(t *testing.T, accountType domain.AccountType) domain.Account {
+func testAccount(t *testing.T, accountType domain.AccountType) domain.AccountInfo {
 	t.Helper()
 
 	id, err := domain.ParseID("123456789")
@@ -113,7 +113,7 @@ func testAccount(t *testing.T, accountType domain.AccountType) domain.Account {
 		t.Fatalf("ParseID() error = %v", err)
 	}
 
-	return domain.Account{
+	return domain.AccountInfo{
 		ID:       id,
 		UserID:   7,
 		Name:     "Daily",
@@ -166,6 +166,9 @@ func TestCreateAccountMapsFields(t *testing.T) {
 	}
 	if created.ID != account.ID {
 		t.Fatalf("ID = %s, want %s", created.ID, account.ID)
+	}
+	if created.Ledger != 1 {
+		t.Fatalf("Ledger = %d, want 1", created.Ledger)
 	}
 }
 
@@ -266,6 +269,9 @@ func TestGetAccountMapsFields(t *testing.T) {
 	if found.Type != 1000 {
 		t.Fatalf("Type = %d, want 1000", found.Type)
 	}
+	if found.Ledger != 1 {
+		t.Fatalf("Ledger = %d, want 1", found.Ledger)
+	}
 }
 
 func TestGetAccountNotFound(t *testing.T) {
@@ -351,6 +357,8 @@ func TestCreateAccountDifferentUserData(t *testing.T) {
 				lookupAccounts: []tigerbeetle_go.Account{{
 					ID:         toTigerbeetleID(account.ID),
 					UserData64: 99,
+					Ledger:     1,
+					Code:       1000,
 				}},
 			}
 			repository := NewAccounts(client, &fakeCurrencies{info: domain.CurrencyInfo{Ledger: 1}})

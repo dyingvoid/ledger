@@ -10,7 +10,7 @@ import (
 	"github.com/dyingvoid/ledger/services/accounting/internal/domain"
 )
 
-func testAccount(t *testing.T) domain.Account {
+func testAccount(t *testing.T) domain.AccountInfo {
 	t.Helper()
 
 	id, err := domain.ParseID("42")
@@ -18,7 +18,7 @@ func testAccount(t *testing.T) domain.Account {
 		t.Fatalf("ParseID() error = %v", err)
 	}
 
-	return domain.Account{
+	return domain.AccountInfo{
 		ID:          id,
 		UserID:      7,
 		Name:        "Daily",
@@ -40,38 +40,38 @@ func TestSameAccountInfo(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		existing domain.Account
+		existing domain.AccountInfo
 		want     bool
 	}{
 		{name: "identical", existing: account, want: true},
 		{
 			name:     "different ID",
-			existing: withField(account, func(a *domain.Account) { a.ID = differentID }),
+			existing: withField(account, func(a *domain.AccountInfo) { a.ID = differentID }),
 			want:     false,
 		},
 		{
 			name:     "different user",
-			existing: withField(account, func(a *domain.Account) { a.UserID = 8 }),
+			existing: withField(account, func(a *domain.AccountInfo) { a.UserID = 8 }),
 			want:     false,
 		},
 		{
 			name:     "different name",
-			existing: withField(account, func(a *domain.Account) { a.Name = "Other" }),
+			existing: withField(account, func(a *domain.AccountInfo) { a.Name = "Other" }),
 			want:     false,
 		},
 		{
 			name:     "different description",
-			existing: withField(account, func(a *domain.Account) { a.Description = "Other" }),
+			existing: withField(account, func(a *domain.AccountInfo) { a.Description = "Other" }),
 			want:     false,
 		},
 		{
 			name:     "different type",
-			existing: withField(account, func(a *domain.Account) { a.Type = 1000 }),
+			existing: withField(account, func(a *domain.AccountInfo) { a.Type = 1000 }),
 			want:     false,
 		},
 		{
 			name:     "different currency",
-			existing: withField(account, func(a *domain.Account) { a.Currency = "CNY" }),
+			existing: withField(account, func(a *domain.AccountInfo) { a.Currency = "CNY" }),
 			want:     false,
 		},
 	}
@@ -87,7 +87,10 @@ func TestSameAccountInfo(t *testing.T) {
 	}
 }
 
-func withField(account domain.Account, mutate func(*domain.Account)) domain.Account {
+func withField(
+	account domain.AccountInfo,
+	mutate func(*domain.AccountInfo),
+) domain.AccountInfo {
 	mutate(&account)
 	return account
 }

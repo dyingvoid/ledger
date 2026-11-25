@@ -26,10 +26,13 @@ func NewAccounts(pool *pgxpool.Pool) *Accounts {
 	return &Accounts{pool: pool}
 }
 
-func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.Account, error) {
+func (r *Accounts) Create(
+	ctx context.Context,
+	account domain.AccountInfo,
+) (domain.AccountInfo, error) {
 	id := account.ID.Bytes()
 
-	created, err := scanAccount(r.pool.QueryRow(
+	created, err := scanAccountInfo(r.pool.QueryRow(
 		ctx,
 		`INSERT INTO ledger.account_info (id, user_id, name, description, account_type, currency)
 		 VALUES ($1, $2, $3, $4, $5, $6)
@@ -46,22 +49,22 @@ func (r *Accounts) Create(ctx context.Context, account domain.Account) (domain.A
 		return created, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return domain.Account{}, accountError(err)
+		return domain.AccountInfo{}, accountError(err)
 	}
 
 	existing, err := r.Get(ctx, account.ID)
 	if err != nil {
-		return domain.Account{}, err
+		return domain.AccountInfo{}, err
 	}
 	if !sameAccountInfo(existing, account) {
-		return domain.Account{}, fmt.Errorf("%w: %s", accounts.ErrAccountConflict, account.ID)
+		return domain.AccountInfo{}, fmt.Errorf("%w: %s", accounts.ErrAccountConflict, account.ID)
 	}
 
 	return existing, nil
 }
 
-func (r *Accounts) GetBankCash(ctx context.Context, currency string) (domain.Account, error) {
-	account, err := scanAccount(r.pool.QueryRow(
+func (r *Accounts) GetBankCash(ctx context.Context, currency string) (domain.AccountInfo, error) {
+	account, err := scanAccountInfo(r.pool.QueryRow(
 		ctx,
 		`SELECT id, user_id, name, description, account_type, currency, deleted_at, created_at
 		 FROM ledger.account_info
@@ -74,19 +77,19 @@ func (r *Accounts) GetBankCash(ctx context.Context, currency string) (domain.Acc
 		currency,
 	))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Account{}, fmt.Errorf("%w: %q", accounts.ErrBankCashAccountNotFound, currency)
+		return domain.AccountInfo{}, fmt.Errorf("%w: %q", accounts.ErrBankCashAccountNotFound, currency)
 	}
 	if err != nil {
-		return domain.Account{}, fmt.Errorf("getting bank cash account: %w", err)
+		return domain.AccountInfo{}, fmt.Errorf("getting bank cash account: %w", err)
 	}
 
 	return account, nil
 }
 
-func (r *Accounts) Get(ctx context.Context, id domain.ID) (domain.Account, error) {
+func (r *Accounts) Get(ctx context.Context, id domain.ID) (domain.AccountInfo, error) {
 	stored := id.Bytes()
 
-	account, err := scanAccount(r.pool.QueryRow(
+	account, err := scanAccountInfo(r.pool.QueryRow(
 		ctx,
 		`SELECT id, user_id, name, description, account_type, currency, deleted_at, created_at
 		 FROM ledger.account_info
@@ -95,10 +98,10 @@ func (r *Accounts) Get(ctx context.Context, id domain.ID) (domain.Account, error
 		stored[:],
 	))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Account{}, fmt.Errorf("%w: %s", accounts.ErrAccountNotFound, id)
+		return domain.AccountInfo{}, fmt.Errorf("%w: %s", accounts.ErrAccountNotFound, id)
 	}
 	if err != nil {
-		return domain.Account{}, fmt.Errorf("getting account info: %w", err)
+		return domain.AccountInfo{}, fmt.Errorf("getting account info: %w", err)
 	}
 
 	return account, nil
@@ -108,9 +111,9 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-func scanAccount(row rowScanner) (domain.Account, error) {
+func scanAccountInfo(row rowScanner) (domain.AccountInfo, error) {
 	var (
-		account  domain.Account
+		account  domain.AccountInfo
 		stored   []byte
 		typ      int32
 		currency string
@@ -127,10 +130,10 @@ func scanAccount(row rowScanner) (domain.Account, error) {
 		&account.CreatedAt,
 	)
 	if err != nil {
-		return domain.Account{}, err
+		return domain.AccountInfo{}, err
 	}
 	if len(stored) != 16 {
-		return domain.Account{}, fmt.Errorf("account info ID has %d bytes, want 16", len(stored))
+		return domain.AccountInfo{}, fmt.Errorf("account info ID has %d bytes, want 16", len(stored))
 	}
 
 	account.ID = domain.IDFromBytes([16]byte(stored))
@@ -139,7 +142,7 @@ func scanAccount(row rowScanner) (domain.Account, error) {
 	return account, nil
 }
 
-func sameAccountInfo(existing domain.Account, account domain.Account) bool {
+func sameAccountInfo(existing domain.AccountInfo, account domain.AccountInfo) bool {
 	return existing.ID == account.ID &&
 		existing.UserID == account.UserID &&
 		existing.Name == account.Name &&

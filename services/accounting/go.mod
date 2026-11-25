@@ -3,6 +3,7 @@ module github.com/dyingvoid/ledger/services/accounting
 go 1.27.1
 
 require (
+	github.com/dyingvoid/ledger/shared v0.0.0
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -22,3 +23,5 @@ require (
 	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260817212433-ac3dfec99bb1 // indirect
 )
+
+replace github.com/dyingvoid/ledger/shared => ../../shared

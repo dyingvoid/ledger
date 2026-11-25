@@ -10,18 +10,17 @@ import (
 	"github.com/dyingvoid/ledger/services/accounting/internal/logger"
 )
 
-func (s *Service) OpenLedgerAccount(ctx context.Context, id domain.ID) (domain.Account, error) {
+func (s *Service) OpenLedgerAccount(ctx context.Context, id domain.ID) (domain.AccountLedger, error) {
 	account, err := s.infos.Get(ctx, id)
 	if err != nil {
-		return domain.Account{}, fmt.Errorf("reading account info: %w", err)
+		return domain.AccountLedger{}, fmt.Errorf("reading account info: %w", err)
 	}
 
-	// TODO: all requests later must go through some auth middleware, that fetches account data and compares to userID
 	existing, err := s.ledger.Get(ctx, id)
 	switch {
 	case err == nil:
 		if existing.UserID != account.UserID {
-			return domain.Account{}, fmt.Errorf(
+			return domain.AccountLedger{}, fmt.Errorf(
 				"%w: account %s belongs to user %d, requested by user %d",
 				domain_errors.ErrAccountOwnedByAnotherUser,
 				id,
@@ -37,14 +36,14 @@ func (s *Service) OpenLedgerAccount(ctx context.Context, id domain.ID) (domain.A
 			"user_id", account.UserID,
 		)
 
-		return account, nil
+		return existing, nil
 	case !errors.Is(err, ErrAccountNotFound):
-		return domain.Account{}, fmt.Errorf("checking ledger account: %w", err)
+		return domain.AccountLedger{}, fmt.Errorf("checking ledger account: %w", err)
 	}
 
 	opened, err := s.ledger.Create(ctx, account)
 	if err != nil {
-		return domain.Account{}, fmt.Errorf("open ledger account: %w", err)
+		return domain.AccountLedger{}, fmt.Errorf("open ledger account: %w", err)
 	}
 
 	logger.FromContext(ctx).InfoContext(

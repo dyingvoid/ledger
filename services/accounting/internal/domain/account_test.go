@@ -185,15 +185,15 @@ func TestAccountTypeValidate(t *testing.T) {
 	}
 }
 
-func TestNewAccount(t *testing.T) {
+func TestNewAccountInfo(t *testing.T) {
 	t.Parallel()
 
 	t.Run("trims name and description", func(t *testing.T) {
 		t.Parallel()
 
-		account, err := NewAccount(testID(t, "1"), 7, "  Daily  ", "  Spending  ", 2100, "USD")
+		account, err := NewAccountInfo(testID(t, "1"), 7, "  Daily  ", "  Spending  ", 2100, "USD")
 		if err != nil {
-			t.Fatalf("NewAccount() error = %v", err)
+			t.Fatalf("NewAccountInfo() error = %v", err)
 		}
 		if account.Name != "Daily" {
 			t.Fatalf("Name = %q, want %q", account.Name, "Daily")
@@ -206,18 +206,18 @@ func TestNewAccount(t *testing.T) {
 	t.Run("rejects missing ID", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewAccount(ID{}, 7, "Daily", "", 2100, "USD")
+		_, err := NewAccountInfo(ID{}, 7, "Daily", "", 2100, "USD")
 		if !errors.Is(err, domain_errors.ErrAccountIDRequired) {
-			t.Fatalf("NewAccount() error = %v, want %v", err, domain_errors.ErrAccountIDRequired)
+			t.Fatalf("NewAccountInfo() error = %v, want %v", err, domain_errors.ErrAccountIDRequired)
 		}
 	})
 
 	t.Run("rejects missing user", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewAccount(testID(t, "1"), 0, "Daily", "", 2100, "USD")
+		_, err := NewAccountInfo(testID(t, "1"), 0, "Daily", "", 2100, "USD")
 		if !errors.Is(err, domain_errors.ErrAccountUserRequired) {
-			t.Fatalf("NewAccount() error = %v, want %v", err, domain_errors.ErrAccountUserRequired)
+			t.Fatalf("NewAccountInfo() error = %v, want %v", err, domain_errors.ErrAccountUserRequired)
 		}
 	})
 
@@ -225,9 +225,9 @@ func TestNewAccount(t *testing.T) {
 		t.Parallel()
 
 		for _, accountType := range []AccountType{999, 6000} {
-			_, err := NewAccount(testID(t, "1"), 7, "Daily", "", accountType, "USD")
+			_, err := NewAccountInfo(testID(t, "1"), 7, "Daily", "", accountType, "USD")
 			if !errors.Is(err, domain_errors.ErrAccountTypeInvalid) {
-				t.Fatalf("NewAccount(%d) error = %v, want %v", accountType, err, domain_errors.ErrAccountTypeInvalid)
+				t.Fatalf("NewAccountInfo(%d) error = %v, want %v", accountType, err, domain_errors.ErrAccountTypeInvalid)
 			}
 		}
 	})
@@ -235,20 +235,98 @@ func TestNewAccount(t *testing.T) {
 	t.Run("rejects empty currency", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewAccount(testID(t, "1"), 7, "Daily", "", 2100, "  ")
+		_, err := NewAccountInfo(testID(t, "1"), 7, "Daily", "", 2100, "  ")
 		if !errors.Is(err, domain_errors.ErrAccountCurrencyRequired) {
-			t.Fatalf("NewAccount() error = %v, want %v", err, domain_errors.ErrAccountCurrencyRequired)
+			t.Fatalf("NewAccountInfo() error = %v, want %v", err, domain_errors.ErrAccountCurrencyRequired)
 		}
 	})
 
 	t.Run("rejects empty name", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := NewAccount(testID(t, "1"), 7, "  ", "", 2100, "USD")
+		_, err := NewAccountInfo(testID(t, "1"), 7, "  ", "", 2100, "USD")
 		if !errors.Is(err, domain_errors.ErrAccountNameRequired) {
-			t.Fatalf("NewAccount() error = %v, want %v", err, domain_errors.ErrAccountNameRequired)
+			t.Fatalf("NewAccountInfo() error = %v, want %v", err, domain_errors.ErrAccountNameRequired)
 		}
 	})
+}
+
+func TestNewAccountLedger(t *testing.T) {
+	t.Parallel()
+
+	t.Run("maps ledger fields", func(t *testing.T) {
+		t.Parallel()
+
+		account, err := NewAccountLedger(testID(t, "1"), 7, 1, 2100)
+		if err != nil {
+			t.Fatalf("NewAccountLedger() error = %v", err)
+		}
+		if account.ID.String() != "1" {
+			t.Fatalf("ID = %s, want 1", account.ID)
+		}
+		if account.UserID != 7 {
+			t.Fatalf("UserID = %d, want 7", account.UserID)
+		}
+		if account.Ledger != 1 {
+			t.Fatalf("Ledger = %d, want 1", account.Ledger)
+		}
+		if account.Type != 2100 {
+			t.Fatalf("Type = %d, want 2100", account.Type)
+		}
+	})
+
+	tests := []struct {
+		name    string
+		id      ID
+		userID  int64
+		ledger  uint32
+		typ     AccountType
+		wantErr error
+	}{
+		{
+			name:    "rejects missing ID",
+			id:      ID{},
+			userID:  7,
+			ledger:  1,
+			typ:     2100,
+			wantErr: domain_errors.ErrAccountIDRequired,
+		},
+		{
+			name:    "rejects missing user",
+			id:      testID(t, "1"),
+			userID:  0,
+			ledger:  1,
+			typ:     2100,
+			wantErr: domain_errors.ErrAccountUserRequired,
+		},
+		{
+			name:    "rejects missing ledger",
+			id:      testID(t, "1"),
+			userID:  7,
+			ledger:  0,
+			typ:     2100,
+			wantErr: domain_errors.ErrAccountLedgerRequired,
+		},
+		{
+			name:    "rejects invalid type",
+			id:      testID(t, "1"),
+			userID:  7,
+			ledger:  1,
+			typ:     999,
+			wantErr: domain_errors.ErrAccountTypeInvalid,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := NewAccountLedger(test.id, test.userID, test.ledger, test.typ)
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("NewAccountLedger() error = %v, want %v", err, test.wantErr)
+			}
+		})
+	}
 }
 
 func testID(t *testing.T, value string) ID {
