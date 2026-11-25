@@ -14,6 +14,7 @@ DURATION ?= 1m
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
 	tigerbeetle-up tigerbeetle-down tigerbeetle-logs \
+	temporal-up temporal-down temporal-logs \
 	migrate-up migrate-down migrate-action migrate-create \
 	proto-gen proto-lint \
 	loadtest-accounts loadtest-deposit loadtest-matrix
@@ -67,7 +68,7 @@ docker-down:
 	@docker compose down
 
 docker-logs:
-	@docker compose logs -f accounting bff
+	@docker compose logs -f accounting bff temporal
 
 postgres-up:
 	@docker compose up -d --wait postgres
@@ -86,6 +87,15 @@ tigerbeetle-down:
 
 tigerbeetle-logs:
 	@docker compose logs -f tigerbeetle
+
+temporal-up:
+	@docker compose up -d --wait temporal
+
+temporal-down:
+	@docker compose down
+
+temporal-logs:
+	@docker compose logs -f temporal
 
 migrate-up:
 	@$(MAKE) migrate-action action=up
