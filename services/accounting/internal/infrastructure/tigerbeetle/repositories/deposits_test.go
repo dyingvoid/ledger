@@ -34,14 +34,14 @@ func testDeposit(t *testing.T, clientAccountID string, bankAccountID string, tra
 			Ledger:     1,
 			AssetScale: 2,
 		},
-		domain.Account{
+		domain.AccountInfo{
 			ID:       testID(t, clientAccountID),
 			UserID:   7,
 			Name:     "Client",
 			Type:     domain.AccountTypeClientDeposit,
 			Currency: testUSD,
 		},
-		domain.Account{
+		domain.AccountInfo{
 			ID:       testID(t, bankAccountID),
 			UserID:   1,
 			Name:     "Bank Cash",

@@ -15,8 +15,8 @@ import (
 var ErrLedgerUnavailable = errors.New("ledger unavailable")
 
 type AccountRepository interface {
-	Get(ctx context.Context, id domain.ID) (domain.Account, error)
-	GetBankCash(ctx context.Context, currency string) (domain.Account, error)
+	Get(ctx context.Context, id domain.ID) (domain.AccountInfo, error)
+	GetBankCash(ctx context.Context, currency string) (domain.AccountInfo, error)
 }
 
 type CurrencyRepository interface {

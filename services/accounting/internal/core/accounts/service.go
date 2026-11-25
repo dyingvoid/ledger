@@ -6,16 +6,14 @@ import (
 	"github.com/dyingvoid/ledger/services/accounting/internal/domain"
 )
 
-// TODO: must work with domain AccountInfo
 type InfoRepository interface {
-	Create(ctx context.Context, account domain.Account) (domain.Account, error)
-	Get(ctx context.Context, id domain.ID) (domain.Account, error)
+	Create(ctx context.Context, account domain.AccountInfo) (domain.AccountInfo, error)
+	Get(ctx context.Context, id domain.ID) (domain.AccountInfo, error)
 }
 
-// TODO: introduce separate account domain entity for ledger data
 type LedgerRepository interface {
-	Create(ctx context.Context, account domain.Account) (domain.Account, error)
-	Get(ctx context.Context, id domain.ID) (domain.Account, error)
+	Create(ctx context.Context, account domain.AccountInfo) (domain.AccountLedger, error)
+	Get(ctx context.Context, id domain.ID) (domain.AccountLedger, error)
 }
 
 type Service struct {

@@ -196,7 +196,7 @@ func (x *OpenLedgerAccountRequest) GetId() string {
 
 type OpenLedgerAccountResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Account       *AccountInfo           `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	Account       *AccountLedger         `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -231,7 +231,7 @@ func (*OpenLedgerAccountResponse) Descriptor() ([]byte, []int) {
 	return file_ledger_accounts_v1_accounts_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *OpenLedgerAccountResponse) GetAccount() *AccountInfo {
+func (x *OpenLedgerAccountResponse) GetAccount() *AccountLedger {
 	if x != nil {
 		return x.Account
 	}
@@ -330,6 +330,74 @@ func (x *AccountInfo) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type AccountLedger struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId        int64                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Ledger        uint32                 `protobuf:"varint,3,opt,name=ledger,proto3" json:"ledger,omitempty"`
+	Type          int32                  `protobuf:"varint,4,opt,name=type,proto3" json:"type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccountLedger) Reset() {
+	*x = AccountLedger{}
+	mi := &file_ledger_accounts_v1_accounts_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountLedger) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountLedger) ProtoMessage() {}
+
+func (x *AccountLedger) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_accounts_v1_accounts_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountLedger.ProtoReflect.Descriptor instead.
+func (*AccountLedger) Descriptor() ([]byte, []int) {
+	return file_ledger_accounts_v1_accounts_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AccountLedger) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AccountLedger) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *AccountLedger) GetLedger() uint32 {
+	if x != nil {
+		return x.Ledger
+	}
+	return 0
+}
+
+func (x *AccountLedger) GetType() int32 {
+	if x != nil {
+		return x.Type
+	}
+	return 0
+}
+
 var File_ledger_accounts_v1_accounts_proto protoreflect.FileDescriptor
 
 const file_ledger_accounts_v1_accounts_proto_rawDesc = "" +
@@ -345,9 +413,9 @@ const file_ledger_accounts_v1_accounts_proto_rawDesc = "" +
 	"\x19CreateAccountInfoResponse\x129\n" +
 	"\aaccount\x18\x01 \x01(\v2\x1f.ledger.accounts.v1.AccountInfoR\aaccount\"*\n" +
 	"\x18OpenLedgerAccountRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"V\n" +
-	"\x19OpenLedgerAccountResponse\x129\n" +
-	"\aaccount\x18\x01 \x01(\v2\x1f.ledger.accounts.v1.AccountInfoR\aaccount\"\xd7\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"X\n" +
+	"\x19OpenLedgerAccountResponse\x12;\n" +
+	"\aaccount\x18\x01 \x01(\v2!.ledger.accounts.v1.AccountLedgerR\aaccount\"\xd7\x01\n" +
 	"\vAccountInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x12\n" +
@@ -356,7 +424,12 @@ const file_ledger_accounts_v1_accounts_proto_rawDesc = "" +
 	"\x04type\x18\x05 \x01(\x05R\x04type\x12\x1a\n" +
 	"\bcurrency\x18\x06 \x01(\tR\bcurrency\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xf4\x01\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"d\n" +
+	"\rAccountLedger\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x16\n" +
+	"\x06ledger\x18\x03 \x01(\rR\x06ledger\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\x05R\x04type2\xf4\x01\n" +
 	"\x0eAccountService\x12p\n" +
 	"\x11CreateAccountInfo\x12,.ledger.accounts.v1.CreateAccountInfoRequest\x1a-.ledger.accounts.v1.CreateAccountInfoResponse\x12p\n" +
 	"\x11OpenLedgerAccount\x12,.ledger.accounts.v1.OpenLedgerAccountRequest\x1a-.ledger.accounts.v1.OpenLedgerAccountResponseBLZJgithub.com/dyingvoid/ledger/shared/pkg/proto/ledger/accounts/v1;accountsv1b\x06proto3"
@@ -373,19 +446,20 @@ func file_ledger_accounts_v1_accounts_proto_rawDescGZIP() []byte {
 	return file_ledger_accounts_v1_accounts_proto_rawDescData
 }
 
-var file_ledger_accounts_v1_accounts_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_ledger_accounts_v1_accounts_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_ledger_accounts_v1_accounts_proto_goTypes = []any{
 	(*CreateAccountInfoRequest)(nil),  // 0: ledger.accounts.v1.CreateAccountInfoRequest
 	(*CreateAccountInfoResponse)(nil), // 1: ledger.accounts.v1.CreateAccountInfoResponse
 	(*OpenLedgerAccountRequest)(nil),  // 2: ledger.accounts.v1.OpenLedgerAccountRequest
 	(*OpenLedgerAccountResponse)(nil), // 3: ledger.accounts.v1.OpenLedgerAccountResponse
 	(*AccountInfo)(nil),               // 4: ledger.accounts.v1.AccountInfo
-	(*timestamppb.Timestamp)(nil),     // 5: google.protobuf.Timestamp
+	(*AccountLedger)(nil),             // 5: ledger.accounts.v1.AccountLedger
+	(*timestamppb.Timestamp)(nil),     // 6: google.protobuf.Timestamp
 }
 var file_ledger_accounts_v1_accounts_proto_depIdxs = []int32{
 	4, // 0: ledger.accounts.v1.CreateAccountInfoResponse.account:type_name -> ledger.accounts.v1.AccountInfo
-	4, // 1: ledger.accounts.v1.OpenLedgerAccountResponse.account:type_name -> ledger.accounts.v1.AccountInfo
-	5, // 2: ledger.accounts.v1.AccountInfo.created_at:type_name -> google.protobuf.Timestamp
+	5, // 1: ledger.accounts.v1.OpenLedgerAccountResponse.account:type_name -> ledger.accounts.v1.AccountLedger
+	6, // 2: ledger.accounts.v1.AccountInfo.created_at:type_name -> google.protobuf.Timestamp
 	0, // 3: ledger.accounts.v1.AccountService.CreateAccountInfo:input_type -> ledger.accounts.v1.CreateAccountInfoRequest
 	2, // 4: ledger.accounts.v1.AccountService.OpenLedgerAccount:input_type -> ledger.accounts.v1.OpenLedgerAccountRequest
 	1, // 5: ledger.accounts.v1.AccountService.CreateAccountInfo:output_type -> ledger.accounts.v1.CreateAccountInfoResponse
@@ -408,7 +482,7 @@ func file_ledger_accounts_v1_accounts_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ledger_accounts_v1_accounts_proto_rawDesc), len(file_ledger_accounts_v1_accounts_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

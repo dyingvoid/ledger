@@ -10,16 +10,16 @@ type Deposit struct {
 	ID            ID           `json:"id"`
 	AmountMinor   int64        `json:"amount_minor"`
 	Currency      CurrencyInfo `json:"currency"`
-	ClientAccount Account      `json:"client_account"`
-	BankAccount   Account      `json:"bank_account"`
+	ClientAccount AccountInfo  `json:"client_account"`
+	BankAccount   AccountInfo  `json:"bank_account"`
 }
 
 func NewDeposit(
 	id ID,
 	amountMinor int64,
 	currency CurrencyInfo,
-	clientAccount Account,
-	bankAccount Account,
+	clientAccount AccountInfo,
+	bankAccount AccountInfo,
 ) (Deposit, error) {
 	deposit := Deposit{
 		ID:            id,
