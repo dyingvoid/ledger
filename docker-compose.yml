@@ -1,8 +1,8 @@
 services:
-  ledger:
+  accounting:
     build:
       context: .
-      dockerfile: cmd/ledger/Dockerfile
+      dockerfile: services/accounting/cmd/ledger/Dockerfile
     environment:
       TIME_ZONE: ${TIME_ZONE:-UTC}
       POSTGRES_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
@@ -23,6 +23,20 @@ services:
       - "${GRPC_PORT:-50051}:50051"
     security_opt:
       - seccomp=unconfined
+
+  bff:
+    build:
+      context: .
+      dockerfile: services/bff/cmd/bff/Dockerfile
+    environment:
+      TIME_ZONE: ${TIME_ZONE:-UTC}
+      HTTP_ADDR: ${HTTP_ADDR:-:8080}
+      ACCOUNTING_ADDR: accounting:50051
+    depends_on:
+      accounting:
+        condition: service_started
+    ports:
+      - "${BFF_PORT:-8080}:8080"
 
   postgres:
     image: postgres:17.6-alpine
@@ -66,7 +80,7 @@ services:
     environment:
       PGOPTIONS: "-c lock_timeout=${MIGRATE_LOCK_TIMEOUT:-5}s"
     volumes:
-      - ${PROJECT_ROOT:-.}/migrations:/migrations
+      - ${PROJECT_ROOT:-.}/services/accounting/migrations:/migrations
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,7 +89,7 @@ services:
     image: golangci/golangci-lint:${GOLANGCI_LINT_VERSION:-v2.15.0}
     profiles: [ "lint" ]
     entrypoint: [ "golangci-lint" ]
-    command: [ "run", "./..." ]
+    command: [ "run", "./services/accounting/...", "./services/bff/..." ]
     working_dir: /app
     volumes:
       - ${PROJECT_ROOT:-.}:/app

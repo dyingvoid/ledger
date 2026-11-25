@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package ledger.funds.v1;
+
+option go_package = "github.com/dyingvoid/ledger/services/accounting/pkg/proto/ledger/funds/v1;fundsv1";
+
+service FundsService {
+  rpc Deposit(DepositRequest) returns (DepositResponse);
+}
+
+message DepositRequest {
+  string id = 1;
+  string account_id = 2;
+  int64 amount_minor = 3;
+  string currency = 4;
+}
+
+message DepositResponse {
+  string transfer_id = 1;
+}

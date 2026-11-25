@@ -1,12 +1,15 @@
 -include .env
 export
 
-APP := ledger
+ACCOUNTING_DIR := services/accounting
+BFF_DIR := services/bff
+GO_PACKAGES := ./$(ACCOUNTING_DIR)/... ./$(BFF_DIR)/...
 MIGRATE_LOCK_TIMEOUT ?= 5
 RATE ?= 6
 DURATION ?= 1m
 
-.PHONY: run build test fmt vet lint lint-fix tidy seed \
+.PHONY: run run-accounting run-bff build build-accounting build-bff \
+	test fmt vet lint lint-fix tidy seed \
 	docker-up docker-down docker-logs \
 	postgres-up postgres-down postgres-logs \
 	tigerbeetle-up tigerbeetle-down tigerbeetle-logs \
@@ -14,32 +17,46 @@ DURATION ?= 1m
 	proto-gen proto-lint \
 	loadtest-accounts loadtest-deposit loadtest-matrix
 
-run:
-	@go run ./cmd/$(APP)
+run: run-accounting
 
-build:
-	@go build -o bin/$(APP) ./cmd/$(APP)
+run-accounting:
+	@go run ./$(ACCOUNTING_DIR)/cmd/ledger
+
+run-bff:
+	@go run ./$(BFF_DIR)/cmd/bff
+
+build: build-accounting build-bff
+
+build-accounting:
+	@mkdir -p bin
+	@go build -o bin/accounting ./$(ACCOUNTING_DIR)/cmd/ledger
+
+build-bff:
+	@mkdir -p bin
+	@go build -o bin/bff ./$(BFF_DIR)/cmd/bff
 
 seed:
-	@go run ./cmd/seed -addr localhost:$(or $(GRPC_PORT),50051)
+	@go run ./$(ACCOUNTING_DIR)/cmd/seed -addr localhost:$(or $(GRPC_PORT),50051)
 
 test:
-	@go test -race ./...
+	@go test -race $(GO_PACKAGES)
 
 fmt:
-	@gofmt -s -w .
+	@gofmt -s -w services
 
 vet:
-	@go vet ./...
+	@go vet $(GO_PACKAGES)
 
 lint:
 	@docker compose run --rm lint
 
 lint-fix:
-	@docker compose run --rm lint run --fix ./...
+	@docker compose run --rm lint run --fix ./services/accounting/... ./services/bff/...
 
 tidy:
-	@go mod tidy
+	@go -C $(ACCOUNTING_DIR) mod tidy
+	@go -C $(BFF_DIR) mod tidy
+	@go work sync
 
 docker-up:
 	@docker compose up -d --build --wait
@@ -48,7 +65,7 @@ docker-down:
 	@docker compose down
 
 docker-logs:
-	@docker compose logs -f ledger
+	@docker compose logs -f accounting bff
 
 postgres-up:
 	@docker compose up -d --wait postgres
@@ -97,10 +114,10 @@ migrate-create:
 		-seq "$(seq)"
 
 proto-gen:
-	@cd proto && buf generate
+	@cd $(ACCOUNTING_DIR)/proto && buf generate
 
 proto-lint:
-	@cd proto && buf lint
+	@cd $(ACCOUNTING_DIR)/proto && buf lint
 
 loadtest-accounts:
 	@set -a; . ./.env; [ -f loadtest/seed.env ] && . ./loadtest/seed.env; set +a; \
