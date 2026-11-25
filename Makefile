@@ -56,10 +56,10 @@ lint-fix:
 	@docker compose run --rm lint run --fix ./services/accounting/... ./services/bff/...
 
 tidy:
+	@go work sync
 	@go -C $(SHARED_DIR) mod tidy
 	@go -C $(ACCOUNTING_DIR) mod tidy
 	@go -C $(BFF_DIR) mod tidy
-	@go work sync
 
 docker-up:
 	@docker compose up -d --build --wait
