@@ -8,6 +8,7 @@ import (
 	nethttp "net/http"
 
 	"github.com/dyingvoid/ledger/services/bff/internal/domain"
+	webstatic "github.com/dyingvoid/ledger/services/bff/static"
 )
 
 type CreateCurrency interface {
@@ -35,6 +36,13 @@ func NewHandler(createCurrency CreateCurrency, accounts Accounts, log *slog.Logg
 
 func (h *Handler) Routes() nethttp.Handler {
 	mux := nethttp.NewServeMux()
+	mux.HandleFunc("GET /{$}", func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		nethttp.Redirect(w, r, "/static/", nethttp.StatusFound)
+	})
+	mux.Handle(
+		"GET /static/",
+		nethttp.StripPrefix("/static/", nethttp.FileServerFS(webstatic.Files())),
+	)
 	mux.HandleFunc("GET /healthz", h.health)
 	mux.HandleFunc("POST /v1/currencies", h.createCurrencyHandler)
 	mux.HandleFunc("POST /v1/accounts", h.createAccountHandler)
